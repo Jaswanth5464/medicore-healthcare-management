@@ -3,6 +3,7 @@ using MediCore.API.Modules.Laboratory.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 
 namespace MediCore.API.Modules.Laboratory.Controllers
 {
@@ -12,11 +13,11 @@ namespace MediCore.API.Modules.Laboratory.Controllers
     public class LabController : ControllerBase
     {
         private readonly MediCoreDbContext _context;
-        private readonly Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> _hubContext;
+        private readonly IHubContext<MediCore.API.Hubs.MediCoreHub> _hubContext;
 
         public LabController(
             MediCoreDbContext context,
-            Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext)
+            IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext)
         {
             _context = context;
             _hubContext = hubContext;

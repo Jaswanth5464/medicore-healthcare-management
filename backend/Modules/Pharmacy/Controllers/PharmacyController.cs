@@ -3,6 +3,7 @@ using MediCore.API.Modules.Pharmacy.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 
 namespace MediCore.API.Modules.Pharmacy.Controllers
 {
@@ -12,11 +13,11 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
     public class PharmacyController : ControllerBase
     {
         private readonly MediCoreDbContext _context;
-        private readonly Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> _hubContext;
+        private readonly IHubContext<MediCore.API.Hubs.MediCoreHub> _hubContext;
 
         public PharmacyController(
             MediCoreDbContext context,
-            Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext)
+            IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext)
         {
             _context = context;
             _hubContext = hubContext;

@@ -42,7 +42,6 @@ namespace MediCore.API.Infrastructure.Database.Context
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<MediCore.API.Modules.Pharmacy.Models.Medicine> Medicines { get; set; }
-        public DbSet<MediCore.API.Modules.Pharmacy.Models.Medicine> Medicines { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

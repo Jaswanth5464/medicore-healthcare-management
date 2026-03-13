@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -7,7 +7,7 @@
 namespace MediCore.API.Migrations
 {
     /// <inheritdoc />
-    public partial class adddetails : Migration
+    public partial class AddDetails : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

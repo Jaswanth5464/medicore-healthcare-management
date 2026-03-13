@@ -1,6 +1,5 @@
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Auth.Services;
-using MediCore.API.Modules.Auth.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;

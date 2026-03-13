@@ -1,0 +1,65 @@
+<div class="display-container">
+  <div class="header">
+    <div class="logo">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      </svg>
+      <h1>MediCore Hospital</h1>
+    </div>
+    <div class="clock">
+      <span class="time">{{ currentTime() | date:'shortTime' }}</span>
+      <span class="date">{{ currentTime() | date:'mediumDate' }}</span>
+    </div>
+  </div>
+
+  <div class="board-grid">
+    <!-- NOW SERVING -->
+    <div class="panel serving-panel">
+      <div class="panel-head serving-head">
+        <h2>NOW SERVING</h2>
+        <div class="pulse-dot"></div>
+      </div>
+      <div class="panel-body">
+        <div class="serving-list">
+          @for (item of inConsultationTokens; track item.tokenNumber) {
+            <div class="serving-card pulse-anim">
+              <div class="token-large">{{ item.tokenNumber }}</div>
+              <div class="doc-info">
+                <strong>Dr. {{ item.doctor }}</strong>
+                <span>{{ item.department }}</span>
+              </div>
+              <div class="room-badge">ROOM {{ (item.doctor.length % 5) + 1 }}</div>
+            </div>
+          } @empty {
+            <div class="empty-state">No active consultations at the moment</div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- NEXT IN LINE -->
+    <div class="panel waiting-panel">
+      <div class="panel-head waiting-head">
+        <h2>NEXT IN LINE (PLEASE WAIT)</h2>
+      </div>
+      <div class="panel-body">
+        <div class="waiting-list">
+          @for (item of waitingTokens; track item.tokenNumber) {
+            <div class="waiting-card">
+              <div class="wait-token">{{ item.tokenNumber }}</div>
+              <div class="wait-doc">Dr. {{ item.doctor }}</div>
+            </div>
+          } @empty {
+            <div class="empty-state">Queue is empty</div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-ticker">
+    <marquee scrollamount="6">
+      Welcome to MediCore Hospital! Please wait for your Token Number. Silence mobile phones and maintain a quiet environment. Thank you for your cooperation!
+    </marquee>
+  </div>
+</div>

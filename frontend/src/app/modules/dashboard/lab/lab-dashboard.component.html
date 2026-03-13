@@ -1,0 +1,174 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <div class="header-left">
+      <h1>Laboratory Operations</h1>
+      <p>Manage test orders and upload diagnostic reports</p>
+    </div>
+    
+    <div class="header-stats">
+      <div class="stat-card">
+        <div class="stat-icon pending-icon">🧪</div>
+        <div class="stat-details">
+          <span class="stat-value">{{ queueStr().length }}</span>
+          <span class="stat-label">Total Orders</span>
+        </div>
+      </div>
+      <div class="stat-card success-card">
+        <div class="stat-icon success-icon">✓</div>
+        <div class="stat-details">
+          <span class="stat-value">{{ queueStr().filter(q => q.status === 'Completed').length }}</span>
+          <span class="stat-label">Completed</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn" [class.active]="activeTab() === 'queue'" (click)="activeTab.set('queue')">
+      Test Orders Queue
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'tests'" (click)="activeTab.set('tests')">
+      Test Registry
+    </button>
+  </div>
+
+  <div class="content-area">
+    
+    <!-- QUEUE TAB -->
+    <div *ngIf="activeTab() === 'queue'" class="tab-panel">
+      <div class="panel-header">
+        <h2>Active Diagnostics Queue</h2>
+        <button class="action-btn secondary" (click)="loadQueue()">Refresh Queue</button>
+      </div>
+      
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date/Time</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Test Ordered</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoading()">
+              <td colspan="6" class="empty-state">Loading order queue...</td>
+            </tr>
+            <tr *ngIf="!isLoading() && queueStr().length === 0">
+              <td colspan="6" class="empty-state">No lab orders found.</td>
+            </tr>
+            <tr *ngFor="let order of queueStr()">
+              <td>{{ order.createdAt | date:'shortTime' }}<br><span class="date-sub">{{ order.createdAt | date:'dd MMM yyyy' }}</span></td>
+              <td><strong>{{ order.patientName }}</strong></td>
+              <td>Dr. {{ order.doctorName }}</td>
+              <td>{{ order.testType }}</td>
+              <td>
+                <span class="badge" 
+                      [class.warning]="order.status === 'Pending'" 
+                      [class.success]="order.status === 'Completed'">
+                  {{ order.status }}
+                </span>
+                <span class="badge danger" *ngIf="order.criticalAlert" style="margin-left:4px">Critical</span>
+              </td>
+              <td>
+                <button class="action-btn primary small" *ngIf="order.status === 'Pending'" (click)="openUploadModal(order)">Upload Results</button>
+                <button class="action-btn secondary small" *ngIf="order.status === 'Completed' && order.reportUrl" (click)="viewReport(order.reportUrl)">View PDF</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REGISTRY TAB -->
+    <div *ngIf="activeTab() === 'tests'" class="tab-panel">
+      <div class="panel-header">
+        <h2>Available Lab Tests</h2>
+      </div>
+      
+      <div class="table-container mt-4">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Test Code</th>
+              <th>Test Name</th>
+              <th>Normal Range</th>
+              <th>Price</th>
+              <th>TAT (Hrs)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="testMasters().length === 0">
+              <td colspan="5" class="empty-state">No test masters defined.</td>
+            </tr>
+            <tr *ngFor="let test of testMasters()">
+              <td><code>{{ test.testCode }}</code></td>
+              <td><strong>{{ test.testName }}</strong></td>
+              <td>{{ test.normalRange || 'N/A' }}</td>
+              <td>₹{{ test.price }}</td>
+              <td>{{ test.turnaroundTimeHours }}h</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal-overlay" *ngIf="selectedOrder() !== null">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Upload Lab Results</h2>
+      <button class="close-btn" (click)="closeUploadModal()">✕</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="rx-header" style="margin-bottom: 24px;">
+        <div class="rx-info">
+          <span class="rx-label">Patient</span>
+          <span class="rx-value">{{ selectedOrder().patientName }}</span>
+        </div>
+        <div class="rx-info">
+          <span class="rx-label">Test to Perform</span>
+          <span class="rx-value">{{ selectedOrder().testType }}</span>
+        </div>
+        <div class="rx-info">
+          <span class="rx-label">Date</span>
+          <span class="rx-value">{{ selectedOrder().createdAt | date:'mediumDate' }}</span>
+        </div>
+      </div>
+
+      <div class="form-group mb-4">
+        <label>Upload Report (PDF)</label>
+        <div class="file-upload-mock">
+           <input type="text" [(ngModel)]="uploadData.reportPdfUrl" placeholder="Enter PDF URL or Base64 (Mock UI)">
+           <span class="mock-hint">In production, this would be an &lt;input type="file"&gt;</span>
+        </div>
+      </div>
+
+      <div class="form-group mb-4">
+        <label>Technician Notes</label>
+        <textarea [(ngModel)]="uploadData.resultNotes" rows="3" placeholder="Any observational notes..."></textarea>
+      </div>
+
+      <div class="form-checkbox">
+        <input type="checkbox" id="critical" [(ngModel)]="uploadData.isCritical">
+        <label for="critical" class="text-red font-bold">Flag as Critical Value (Alert Doctor immediately)</label>
+      </div>
+      
+    </div>
+    
+    <div class="modal-footer">
+      <button class="action-btn secondary" (click)="closeUploadModal()">Cancel</button>
+      <button class="action-btn primary" 
+              [disabled]="isUploading()"
+              (click)="submitReport()">
+        {{ isUploading() ? 'Uploading...' : 'Complete Order & Upload' }}
+      </button>
+    </div>
+  </div>
+</div>

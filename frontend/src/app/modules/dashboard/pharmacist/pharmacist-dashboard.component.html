@@ -1,0 +1,249 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <div class="header-left">
+      <h1>Pharmacy & Inventory</h1>
+      <p>Manage medicine dispensing and track hospital stock</p>
+    </div>
+    
+    <div class="header-stats">
+      <div class="stat-card">
+        <div class="stat-icon pending-icon">💊</div>
+        <div class="stat-details">
+          <span class="stat-value">{{ queueStr().length }}</span>
+          <span class="stat-label">Pending Rx</span>
+        </div>
+      </div>
+      <div class="stat-card warning-card">
+        <div class="stat-icon warning-icon">⚠️</div>
+        <div class="stat-details">
+          <span class="stat-value">{{ inventoryData().filter(isLowStock).length }}</span>
+          <span class="stat-label">Low Stock</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn" [class.active]="activeTab() === 'queue'" (click)="activeTab.set('queue')">
+      Dispensing Queue
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'inventory'" (click)="activeTab.set('inventory')">
+      Inventory Management
+    </button>
+  </div>
+
+  <div class="content-area">
+    
+    <!-- QUEUE TAB -->
+    <div *ngIf="activeTab() === 'queue'" class="tab-panel">
+      <div class="panel-header">
+        <h2>Active Prescriptions</h2>
+        <button class="action-btn secondary" (click)="loadQueue()">Refresh Queue</button>
+      </div>
+      
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Diagnosis</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoading()">
+              <td colspan="6" class="empty-state">Loading queue...</td>
+            </tr>
+            <tr *ngIf="!isLoading() && queueStr().length === 0">
+              <td colspan="6" class="empty-state">No pending prescriptions in the queue.</td>
+            </tr>
+            <tr *ngFor="let rx of queueStr()">
+              <td>{{ rx.createdAt | date:'shortTime' }}<br><span class="date-sub">{{ rx.createdAt | date:'dd MMM yyyy' }}</span></td>
+              <td><strong>{{ rx.patientName }}</strong></td>
+              <td>Dr. {{ rx.doctorName }}</td>
+              <td>{{ rx.diagnosis || 'N/A' }}</td>
+              <td>
+                <span class="badge" [class.success]="rx.isDispensed" [class.warning]="!rx.isDispensed">
+                  {{ rx.isDispensed ? 'Dispensed' : 'Pending' }}
+                </span>
+              </td>
+              <td>
+                <button class="action-btn primary small" *ngIf="!rx.isDispensed" (click)="viewPrescription(rx)">View & Dispense</button>
+                <button class="action-btn secondary small" *ngIf="rx.isDispensed" (click)="viewPrescription(rx)">View Receipt</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- INVENTORY TAB -->
+    <div *ngIf="activeTab() === 'inventory'" class="tab-panel">
+      <div class="panel-header flex-between">
+        <h2>Medicine Inventory</h2>
+        <button class="action-btn primary" (click)="toggleAddMedicine()">+ Add New Medicine</button>
+      </div>
+      
+      <!-- ADD MEDICINE FORM -->
+      <div class="form-card" *ngIf="showAddMedicine()">
+        <h3>Add Stock Entry</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Medicine Name *</label>
+            <input type="text" [(ngModel)]="newMedicine.medicineName" placeholder="e.g. Paracetamol 500mg">
+          </div>
+          <div class="form-group">
+            <label>Generic Name</label>
+            <input type="text" [(ngModel)]="newMedicine.genericName" placeholder="Acetaminophen">
+          </div>
+          <div class="form-group">
+            <label>Category *</label>
+            <select [(ngModel)]="newMedicine.category">
+              <option value="">Select Category</option>
+              <option value="Tablet">Tablet</option>
+              <option value="Syrup">Syrup</option>
+              <option value="Injection">Injection</option>
+              <option value="Capsule">Capsule</option>
+              <option value="Ointment">Ointment</option>
+              <option value="Drops">Drops</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Manufacturer</label>
+            <input type="text" [(ngModel)]="newMedicine.manufacturer" placeholder="Company Name">
+          </div>
+          <div class="form-group">
+            <label>Price (₹) *</label>
+            <input type="number" [(ngModel)]="newMedicine.price" min="0">
+          </div>
+          <div class="form-group">
+            <label>Add Stock Quantity</label>
+            <input type="number" [(ngModel)]="newMedicine.stockQuantity" min="0">
+          </div>
+          <div class="form-group">
+            <label>Low Stock Threshold</label>
+            <input type="number" [(ngModel)]="newMedicine.lowStockThreshold" min="0">
+          </div>
+          <div class="form-group">
+            <label>Expiry Date</label>
+            <input type="date" [(ngModel)]="newMedicine.expiryDate">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="action-btn secondary" (click)="toggleAddMedicine()">Cancel</button>
+          <button class="action-btn primary" (click)="addMedicine()">Save to Inventory</button>
+        </div>
+      </div>
+
+      <div class="table-container mt-4">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Medicine</th>
+              <th>Category</th>
+              <th>Manufacturer</th>
+              <th>Stock</th>
+              <th>Price</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="inventoryData().length === 0">
+              <td colspan="6" class="empty-state">No medicines found in inventory.</td>
+            </tr>
+            <tr *ngFor="let med of inventoryData()">
+              <td>
+                <strong>{{ med.medicineName }}</strong>
+                <div class="text-xs text-gray-500">{{ med.genericName }}</div>
+              </td>
+              <td>{{ med.category }}</td>
+              <td>{{ med.manufacturer }}</td>
+              <td>
+                <span [class.text-red]="isLowStock(med)" [class.font-bold]="isLowStock(med)">
+                  {{ med.stockQuantity }}
+                </span>
+              </td>
+              <td>₹{{ med.price }}</td>
+              <td>
+                <span class="badge" [class.danger]="isLowStock(med)" [class.success]="!isLowStock(med)">
+                  {{ isLowStock(med) ? 'Low Stock' : 'In Stock' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DISPENSE MODAL -->
+<div class="modal-overlay" *ngIf="selectedPrescription() !== null">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Prescription Details</h2>
+      <button class="close-btn" (click)="closePrescription()">✕</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="rx-header">
+        <div class="rx-info">
+          <span class="rx-label">Patient</span>
+          <span class="rx-value">{{ selectedPrescription().patientName }}</span>
+        </div>
+        <div class="rx-info">
+          <span class="rx-label">Doctor</span>
+          <span class="rx-value">Dr. {{ selectedPrescription().doctorName }}</span>
+        </div>
+        <div class="rx-info">
+          <span class="rx-label">Date</span>
+          <span class="rx-value">{{ selectedPrescription().createdAt | date:'mediumDate' }}</span>
+        </div>
+      </div>
+
+      <div class="rx-diagnosis">
+        <h4>Diagnosis</h4>
+        <p>{{ selectedPrescription().diagnosis || 'Not specified' }}</p>
+      </div>
+
+      <div class="rx-medicines">
+        <h4>Prescribed Medicines</h4>
+        <div class="med-list">
+          <div class="med-item" *ngFor="let med of parseMedicines(selectedPrescription().medicinesJson)">
+            <div class="med-name">💊 {{ med.name }}</div>
+            <div class="med-dosage">{{ med.dosage }} - {{ med.duration }}</div>
+            <div class="med-instructions">{{ med.instructions }}</div>
+          </div>
+          <div *ngIf="parseMedicines(selectedPrescription().medicinesJson).length === 0" class="empty-meds">
+            No specific medicines listed in JSON format. Please refer to printed/PDF version.
+          </div>
+        </div>
+      </div>
+      
+      <div class="rx-notes" *ngIf="selectedPrescription().advice">
+        <h4>Doctor's Advice</h4>
+        <p>{{ selectedPrescription().advice }}</p>
+      </div>
+
+      <div class="warning-box" *ngIf="!selectedPrescription().isDispensed">
+        <strong>⚠️ Warning:</strong> Clicking dispense will automatically deduct available quantities from the inventory for matching medicine names.
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="action-btn secondary" (click)="closePrescription()">Cancel</button>
+      <button class="action-btn primary" 
+              *ngIf="!selectedPrescription().isDispensed"
+              [disabled]="isDispensing()"
+              (click)="dispenseMedicines(selectedPrescription().id)">
+        {{ isDispensing() ? 'Dispensing...' : 'Mark as Dispensed' }}
+      </button>
+      <button class="action-btn success" *ngIf="selectedPrescription().isDispensed" disabled>
+        ✓ Already Dispensed
+      </button>
+    </div>
+  </div>
+</div>

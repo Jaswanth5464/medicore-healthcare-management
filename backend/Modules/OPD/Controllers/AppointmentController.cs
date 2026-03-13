@@ -325,20 +325,24 @@ namespace MediCore.API.Modules.OPD.Controllers
             await _hubContext.Clients.Group("receptionist")
                 .SendAsync("AppointmentStatusChanged", new { id = appointment.Id, status = dto.Status, tokenNumber = appointment.TokenNumber });
             
-            await _hubContext.Clients.Group($"patient-{appointment.PatientUserId}")
+            await _hubContext.Clients.Group($"user-{appointment.PatientUserId}")
                 .SendAsync("AppointmentStatusChanged", new { id = appointment.Id, status = dto.Status, tokenNumber = appointment.TokenNumber });
 
             // Real-time notification: Patient Checked In (Notify Doctor)
             if (dto.Status == "CheckedIn")
             {
                 var patientName = await _context.Users.Where(u => u.Id == appointment.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
-                await _hubContext.Clients.Group($"doctor-{appointment.DoctorProfileId}")
-                    .SendAsync("PatientCheckedIn", new { 
-                        appointmentId = appointment.Id, 
-                        tokenNumber = appointment.TokenNumber,
-                        patientName = patientName,
-                        checkInTime = now
-                    });
+                var doctor = await _context.DoctorProfiles.FindAsync(appointment.DoctorProfileId);
+                if (doctor != null)
+                {
+                    await _hubContext.Clients.Group($"user-{doctor.UserId}")
+                        .SendAsync("PatientCheckedIn", new { 
+                            appointmentId = appointment.Id, 
+                            tokenNumber = appointment.TokenNumber,
+                            patientName = patientName,
+                            checkInTime = now
+                        });
+                }
             }
 
             return Ok(new { success = true, message = $"Status updated to {dto.Status}" });

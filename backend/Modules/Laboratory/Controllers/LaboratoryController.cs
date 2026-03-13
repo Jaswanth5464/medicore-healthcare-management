@@ -75,15 +75,19 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             var patientName = await _context.Users.Where(u => u.Id == order.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
             
             // To Doctor
-            await _hubContext.Clients.Group($"doctor-{order.DoctorProfileId}")
-                .SendAsync("LabReportReady", new { 
-                    orderId = order.Id, 
-                    patientName = patientName, 
-                    testType = order.TestType 
-                });
+            var doctor = await _context.DoctorProfiles.FindAsync(order.DoctorProfileId);
+            if (doctor != null)
+            {
+                await _hubContext.Clients.Group($"user-{doctor.UserId}")
+                    .SendAsync("LabReportReady", new { 
+                        orderId = order.Id, 
+                        patientName = patientName, 
+                        testType = order.TestType 
+                    });
+            }
 
             // To Patient
-            await _hubContext.Clients.Group($"patient-{order.PatientUserId}")
+            await _hubContext.Clients.Group($"user-{order.PatientUserId}")
                 .SendAsync("LabReportReady", new { 
                     orderId = order.Id, 
                     testType = order.TestType 

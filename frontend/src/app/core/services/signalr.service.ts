@@ -45,12 +45,14 @@ export class SignalRService {
 
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(url, {
-        accessTokenFactory: () => token || '',
-        skipNegotiation: true,
-        transport: signalR.HttpTransportType.WebSockets
+        accessTokenFactory: () => token || ''
       })
       .withAutomaticReconnect()
       .build();
+
+    this.hubConnection.onreconnecting((err: any) => console.log('SignalR Reconnecting...', err));
+    this.hubConnection.onreconnected((id?: string) => console.log('SignalR Reconnected', id));
+    this.hubConnection.onclose((err: any) => console.log('SignalR Connection Closed', err));
 
     this.hubConnection.start()
       .then(() => {
@@ -72,8 +74,8 @@ export class SignalRService {
     const user = this.authService.currentUser();
     if (!user || !this.hubConnection) return;
 
-    // join group for user id
-    this.hubConnection.invoke('JoinGroup', `patient-${user.id}`);
+    // join generic human group for individual notifications
+    this.hubConnection.invoke('JoinGroup', `user-${user.id}`);
     
     // join group for specific roles
     if (user.roles?.includes('Receptionist') || user.roles?.includes('SuperAdmin') || user.roles?.includes('HospitalAdmin')) {

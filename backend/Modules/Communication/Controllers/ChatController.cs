@@ -23,6 +23,28 @@ namespace MediCore.API.Modules.Communication.Controllers
             _hubContext = hubContext;
         }
 
+        [HttpGet("users")]
+        public async Task<IActionResult> GetChatUsers()
+        {
+            var userIdStr = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
+
+            // Fetch all active users who are staff (exclude patients or users without roles)
+            var users = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .Where(u => u.IsActive && u.Id != currentUserId)
+                .Select(u => new
+                {
+                    Id = u.Id.ToString(),
+                    FullName = u.FullName,
+                    Role = u.UserRoles.Select(ur => ur.Role.Name).FirstOrDefault() ?? "Staff"
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = users });
+        }
+
         [HttpGet("recent")]
         public async Task<IActionResult> GetRecentMessages([FromQuery] string? withUserId, [FromQuery] string? groupName)
         {

@@ -50,7 +50,7 @@ jobs:
       - name: Install Frontend Dependencies
         run: |
           cd frontend
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --force
 
       - name: Build Frontend (Production)
         run: |

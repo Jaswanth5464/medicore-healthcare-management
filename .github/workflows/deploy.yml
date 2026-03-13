@@ -1,0 +1,65 @@
+name: Deploy MediCore HMS
+
+on:
+  push:
+    branches:
+      - main  # Triggers deployment when you push to the 'main' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ─── BACKEND DEPLOYMENT (Elastic Beanstalk) ───────────────────
+      - name: Setup .NET 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Backend
+        run: |
+          cd backend
+          dotnet publish -c Release -o ./publish
+
+      - name: Generate Deployment Zip
+        run: |
+          cd backend/publish
+          zip -r ../../backend-package.zip .
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region: ${{ secrets.AWS_REGION }}
+          application_name: "MediCore-Backend"
+          environment_name: "MediCore-Backend-env"
+          version_label: "version-${{ github.run_number }}"
+          deployment_package: backend-package.zip
+
+      # ─── FRONTEND DEPLOYMENT (S3) ──────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci # Fast install for CI environments
+
+      - name: Build Frontend (Production)
+        run: |
+          cd frontend
+          npm run build -- --configuration=production
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync frontend/dist/medicore-frontend s3://${{ secrets.S3_BUCKET_NAME }} --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}

@@ -27,10 +27,13 @@ namespace MediCore.API.Modules.OPD.Controllers
             var prescriptions = await _context.Prescriptions.Where(p => p.AppointmentId == appointmentId).ToListAsync();
             var labOrders = await _context.LabOrders.Where(l => l.AppointmentId == appointmentId).ToListAsync();
 
+            var appointment = await _context.Appointments.FindAsync(appointmentId);
+            var patientUserId = appointment?.PatientUserId;
+
             return Ok(new
             {
                 success = true,
-                data = new { vitals, prescriptions, labOrders }
+                data = new { vitals, prescriptions, labOrders, patientUserId }
             });
         }
 

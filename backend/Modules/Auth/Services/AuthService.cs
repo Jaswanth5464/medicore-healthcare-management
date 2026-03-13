@@ -161,6 +161,7 @@ namespace MediCore.API.Modules.Auth.Services
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
+                Id = user.Id,
                 FullName = user.FullName,
                 Email = user.Email,
                 Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList(),

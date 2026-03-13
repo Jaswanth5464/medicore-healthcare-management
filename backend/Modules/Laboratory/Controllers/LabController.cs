@@ -12,10 +12,14 @@ namespace MediCore.API.Modules.Laboratory.Controllers
     public class LabController : ControllerBase
     {
         private readonly MediCoreDbContext _context;
+        private readonly Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> _hubContext;
 
-        public LabController(MediCoreDbContext context)
+        public LabController(
+            MediCoreDbContext context,
+            Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         [HttpGet("tests")]
@@ -68,6 +72,33 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             if (request.IsCritical) order.CriticalAlert = true;
 
             await _context.SaveChangesAsync();
+
+            // Real-time notifications
+            var appointment = await _context.Appointments
+                .Include(a => a.DoctorProfile)
+                .FirstOrDefaultAsync(a => a.Id == order.AppointmentId);
+
+            if (appointment != null)
+            {
+                // Notify Doctor
+                await _hubContext.Clients.Group($"user-{appointment.DoctorProfile.UserId}")
+                    .SendAsync("LabReportReady", new { 
+                        orderId = order.Id, 
+                        patientId = appointment.PatientUserId,
+                        tokenNumber = appointment.TokenNumber,
+                        testType = order.TestType,
+                        isCritical = order.CriticalAlert
+                    });
+
+                // Notify Patient
+                await _hubContext.Clients.Group($"user-{appointment.PatientUserId}")
+                    .SendAsync("LabReportReady", new { 
+                        orderId = order.Id, 
+                        doctorName = appointment.DoctorProfile.UserId.ToString(), // Should get name ideally
+                        testType = order.TestType,
+                        isCritical = order.CriticalAlert
+                    });
+            }
 
             return Ok(new { success = true, message = "Report uploaded successfully" });
         }

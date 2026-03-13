@@ -134,7 +134,7 @@ namespace MediCore.API.Modules.OPD.Controllers
                 });
                 
                 // Real-time notification to receptionist
-                await _hubContext.Clients.Group("receptionist")
+                await _hubContext.Clients.Group(MediCoreHub.ReceptionistGroup)
                     .SendAsync("NewAppointmentRequest", new { 
                         referenceNumber = refNumber,
                         fullName = dto.FullName,

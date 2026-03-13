@@ -12,10 +12,14 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
     public class PharmacyController : ControllerBase
     {
         private readonly MediCoreDbContext _context;
+        private readonly Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> _hubContext;
 
-        public PharmacyController(MediCoreDbContext context)
+        public PharmacyController(
+            MediCoreDbContext context,
+            Microsoft.AspNetCore.SignalR.IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         // GET api/pharmacy/inventory
@@ -77,6 +81,17 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             // Ideally parse medicinesJson and deduct stock. For MVP, we will just mark dispensed.
             prescription.IsDispensed = true;
             await _context.SaveChangesAsync();
+
+            // Notify Patient
+            var appointment = await _context.Appointments.FindAsync(prescription.AppointmentId);
+            if (appointment != null)
+            {
+                await _hubContext.Clients.Group($"user-{appointment.PatientUserId}")
+                    .SendAsync("PrescriptionDispensed", new { 
+                        prescriptionId = prescription.Id,
+                        tokenNumber = appointment.TokenNumber
+                    });
+            }
 
             return Ok(new { success = true, message = "Medicines dispensed successfully" });
         }

@@ -122,6 +122,11 @@ namespace MediCore.API.Modules.Finance.Controllers
             var bill = await _context.Bills.FindAsync(id);
             if (bill == null) return NotFound(new { success = false, message = "Bill not found" });
 
+            if (dto.Status == "Paid" && bill.Status != "Paid")
+            {
+                bill.PaidAt = DateTime.UtcNow;
+            }
+
             bill.Status = dto.Status;
             bill.PaymentMode = dto.PaymentMode;
             bill.UpdatedAt = DateTime.UtcNow;

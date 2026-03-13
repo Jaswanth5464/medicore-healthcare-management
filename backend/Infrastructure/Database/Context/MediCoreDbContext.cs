@@ -6,6 +6,8 @@ using MediCore.API.Modules.Finance.Models;
 using MediCore.API.Modules.Laboratory.Models;
 using MediCore.API.Modules.OPD.Models;
 using MediCore.API.Modules.Patient.Models;
+using MediCore.API.Services;
+using MediCore.API.Modules.Communication.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -38,6 +40,8 @@ namespace MediCore.API.Infrastructure.Database.Context
         public DbSet<DoctorLeave> DoctorLeaves { get; set; }
         public DbSet<PatientProfile> PatientProfiles { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
+        public DbSet<MediCore.API.Modules.Pharmacy.Models.Medicine> Medicines { get; set; }
         public DbSet<MediCore.API.Modules.Pharmacy.Models.Medicine> Medicines { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)

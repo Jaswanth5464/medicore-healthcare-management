@@ -12,6 +12,15 @@ export interface Notification {
   isRead: boolean;
 }
 
+export interface ChatMessage {
+  id?: number;
+  fromUserId: string;
+  toUserId?: string;
+  groupName?: string;
+  message: string;
+  sentAt: Date;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -21,6 +30,8 @@ export class SignalRService {
   // Real-time signals for UI components
   notifications = signal<Notification[]>([]);
   unreadCount = signal(0);
+  chatMessages = signal<ChatMessage[]>([]);
+  activeChatPartner = signal<string | null>(null);
   
   constructor(
     private authService: AuthService,
@@ -149,6 +160,36 @@ export class SignalRService {
         isRead: false
       });
     });
+
+    // Listen for Chat Messages
+    this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, message: string) => {
+      this.addChatMessage({
+        fromUserId,
+        message,
+        sentAt: new Date()
+      });
+    });
+
+    this.hubConnection.on('ReceiveGroupMessage', (groupName: string, fromUserId: string, message: string) => {
+      this.addChatMessage({
+        groupName,
+        fromUserId,
+        message,
+        sentAt: new Date()
+      });
+    });
+    
+    // Listen for Emergency Alerts
+    this.hubConnection.on('ReceiveEmergencyAlert', (location: string, details: string) => {
+      this.addNotification({
+        id: Math.random().toString(36),
+        type: 'EMERGENCY',
+        message: `🚨 EMERGENCY at ${location}: ${details}`,
+        timestamp: new Date(),
+        data: { location, details },
+        isRead: false
+      });
+    });
   }
 
   private addNotification(notif: Notification) {
@@ -177,5 +218,23 @@ export class SignalRService {
   private updateUnreadCount() {
     const count = this.notifications().filter(n => !n.isRead).length;
     this.unreadCount.set(count);
+  }
+
+  // Chat Methods
+  async sendChatMessage(toUserId: string, message: string) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('SendChatMessage', toUserId, message);
+    }
+  }
+
+  async sendGroupMessage(groupName: string, message: string) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('SendGroupMessage', groupName, message);
+    }
+  }
+
+  private addChatMessage(msg: ChatMessage) {
+    const current = this.chatMessages();
+    this.chatMessages.set([...current, msg]);
   }
 }

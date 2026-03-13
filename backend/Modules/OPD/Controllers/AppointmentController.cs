@@ -148,6 +148,10 @@ namespace MediCore.API.Modules.OPD.Controllers
                         .Where(d => d.Id == a.DoctorProfileId)
                         .Select(d => _context.Users.FirstOrDefault(u => u.Id == d.UserId)!.FullName)
                         .FirstOrDefault(),
+                    DoctorUserId = _context.DoctorProfiles
+                        .Where(d => d.Id == a.DoctorProfileId)
+                        .Select(d => d.UserId)
+                        .FirstOrDefault(),
                     DepartmentName = _context.Departments
                         .Where(d => d.Id == a.DepartmentId)
                         .Select(d => d.Name)
@@ -322,7 +326,7 @@ namespace MediCore.API.Modules.OPD.Controllers
             await _context.SaveChangesAsync();
 
             // Real-time notification: Status Changed
-            await _hubContext.Clients.Group("receptionist")
+            await _hubContext.Clients.Group(MediCoreHub.ReceptionistGroup)
                 .SendAsync("AppointmentStatusChanged", new { id = appointment.Id, status = dto.Status, tokenNumber = appointment.TokenNumber });
             
             await _hubContext.Clients.Group($"user-{appointment.PatientUserId}")
@@ -401,7 +405,7 @@ namespace MediCore.API.Modules.OPD.Controllers
 
             // Real-time notification: Payment Received
             var patientNamePayment = await _context.Users.Where(u => u.Id == appointment.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
-            await _hubContext.Clients.Group("receptionist")
+            await _hubContext.Clients.Group(MediCoreHub.ReceptionistGroup)
                 .SendAsync("PaymentReceived", new { 
                     appointmentId = appointment.Id, 
                     tokenNumber = appointment.TokenNumber,
@@ -711,7 +715,7 @@ namespace MediCore.API.Modules.OPD.Controllers
                 await _context.SaveChangesAsync();
 
                 // Real-time notification: New Appointment (Receptionist/Doctor)
-                await _hubContext.Clients.Group("receptionist")
+                await _hubContext.Clients.Group(MediCoreHub.ReceptionistGroup)
                     .SendAsync("AppointmentStatusChanged", new { id = appointment.Id, status = "Scheduled", tokenNumber = appointment.TokenNumber });
 
                 return Ok(new

@@ -24,8 +24,8 @@ namespace MediCore.API.Modules.Finance.Controllers
             var last30Days = DateTime.UtcNow.Date.AddDays(-30);
             
             var revenueByDateData = await _context.Bills
-                .Where(b => b.Status == "Paid" && b.CreatedAt >= last30Days)
-                .GroupBy(b => b.CreatedAt.Date)
+                .Where(b => b.Status == "Paid" && b.PaidAt != null && b.PaidAt >= last30Days)
+                .GroupBy(b => b.PaidAt!.Value.Date)
                 .Select(g => new { Date = g.Key, Amount = g.Sum(b => b.TotalAmount) })
                 .OrderBy(g => g.Date)
                 .ToListAsync();
@@ -101,7 +101,7 @@ namespace MediCore.API.Modules.Finance.Controllers
             var patientsThisMonth = appointments.Count;
             
             var revenueThisMonth = await _context.Bills
-                .Where(b => b.DoctorProfileId == doctorId && b.CreatedAt >= firstDayOfMonth && b.Status == "Paid")
+                .Where(b => b.DoctorProfileId == doctorId && b.PaidAt != null && b.PaidAt >= firstDayOfMonth && b.Status == "Paid")
                 .SumAsync(b => b.TotalAmount);
 
             double avgConsultationMinutes = 0;

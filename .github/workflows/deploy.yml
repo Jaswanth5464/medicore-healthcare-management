@@ -39,6 +39,7 @@ jobs:
           environment_name: "MediCore-Backend-env"
           version_label: "version-${{ github.run_number }}"
           deployment_package: backend-package.zip
+          use_existing_version_if_available: true
 
       # ─── FRONTEND DEPLOYMENT (S3) ──────────────────────────────────
       - name: Setup Node.js

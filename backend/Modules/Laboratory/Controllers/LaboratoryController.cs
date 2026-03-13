@@ -4,6 +4,8 @@ using MediCore.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using MediCore.API.Hubs;
 
 namespace MediCore.API.Modules.Laboratory.Controllers
 {
@@ -14,11 +16,16 @@ namespace MediCore.API.Modules.Laboratory.Controllers
     {
         private readonly MediCoreDbContext _context;
         private readonly IEmailService _emailService;
+        private readonly IHubContext<MediCoreHub> _hubContext;
 
-        public LaboratoryController(MediCoreDbContext context, IEmailService emailService)
+        public LaboratoryController(
+            MediCoreDbContext context, 
+            IEmailService emailService,
+            IHubContext<MediCoreHub> hubContext)
         {
             _context = context;
             _emailService = emailService;
+            _hubContext = hubContext;
         }
 
         // GET api/laboratory/orders
@@ -63,6 +70,25 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             order.CompletedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Real-time notification: Lab Report Ready
+            var patientName = await _context.Users.Where(u => u.Id == order.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
+            
+            // To Doctor
+            await _hubContext.Clients.Group($"doctor-{order.DoctorProfileId}")
+                .SendAsync("LabReportReady", new { 
+                    orderId = order.Id, 
+                    patientName = patientName, 
+                    testType = order.TestType 
+                });
+
+            // To Patient
+            await _hubContext.Clients.Group($"patient-{order.PatientUserId}")
+                .SendAsync("LabReportReady", new { 
+                    orderId = order.Id, 
+                    testType = order.TestType 
+                });
+
             return Ok(new { success = true, message = "Lab results updated successfully" });
         }
 

@@ -4,6 +4,8 @@ using MediCore.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using MediCore.API.Hubs;
 
 namespace MediCore.API.Modules.OPD.Controllers
 {
@@ -13,13 +15,16 @@ namespace MediCore.API.Modules.OPD.Controllers
     {
         private readonly MediCoreDbContext _context;
         private readonly IEmailService _emailService;
+        private readonly IHubContext<MediCoreHub> _hubContext;
 
         public AppointmentRequestController(
             MediCoreDbContext context,
-            IEmailService emailService)
+            IEmailService emailService,
+            IHubContext<MediCoreHub> hubContext)
         {
             _context = context;
             _emailService = emailService;
+            _hubContext = hubContext;
         }
 
         // ── PUBLIC — No Auth needed ──────────────────
@@ -127,6 +132,15 @@ namespace MediCore.API.Modules.OPD.Controllers
                         refNumber
                     );
                 });
+                
+                // Real-time notification to receptionist
+                await _hubContext.Clients.Group("receptionist")
+                    .SendAsync("NewAppointmentRequest", new { 
+                        referenceNumber = refNumber,
+                        fullName = dto.FullName,
+                        visitType = request.VisitType,
+                        createdAt = request.CreatedAt
+                    });
 
                 return Ok(new
                 {

@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore.Migrations;
 using MediCore.API.Services;
+using Microsoft.AspNetCore.SignalR;
+using MediCore.API.Hubs;
 
 namespace MediCore.API.Modules.OPD.Controllers
 {
@@ -13,10 +15,17 @@ namespace MediCore.API.Modules.OPD.Controllers
     public class AppointmentController : ControllerBase
     {
         private readonly MediCoreDbContext _context;
+        private readonly IHubContext<MediCoreHub> _hubContext;
+        private readonly IEmailService _emailService;
 
-        public AppointmentController(MediCoreDbContext context)
+        public AppointmentController(
+            MediCoreDbContext context, 
+            IHubContext<MediCoreHub> hubContext,
+            IEmailService emailService)
         {
             _context = context;
+            _hubContext = hubContext;
+            _emailService = emailService;
         }
 
         // GET api/appointments/today
@@ -311,6 +320,27 @@ namespace MediCore.API.Modules.OPD.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // Real-time notification: Status Changed
+            await _hubContext.Clients.Group("receptionist")
+                .SendAsync("AppointmentStatusChanged", new { id = appointment.Id, status = dto.Status, tokenNumber = appointment.TokenNumber });
+            
+            await _hubContext.Clients.Group($"patient-{appointment.PatientUserId}")
+                .SendAsync("AppointmentStatusChanged", new { id = appointment.Id, status = dto.Status, tokenNumber = appointment.TokenNumber });
+
+            // Real-time notification: Patient Checked In (Notify Doctor)
+            if (dto.Status == "CheckedIn")
+            {
+                var patientName = await _context.Users.Where(u => u.Id == appointment.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
+                await _hubContext.Clients.Group($"doctor-{appointment.DoctorProfileId}")
+                    .SendAsync("PatientCheckedIn", new { 
+                        appointmentId = appointment.Id, 
+                        tokenNumber = appointment.TokenNumber,
+                        patientName = patientName,
+                        checkInTime = now
+                    });
+            }
+
             return Ok(new { success = true, message = $"Status updated to {dto.Status}" });
         }
 
@@ -364,6 +394,18 @@ namespace MediCore.API.Modules.OPD.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // Real-time notification: Payment Received
+            var patientNamePayment = await _context.Users.Where(u => u.Id == appointment.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
+            await _hubContext.Clients.Group("receptionist")
+                .SendAsync("PaymentReceived", new { 
+                    appointmentId = appointment.Id, 
+                    tokenNumber = appointment.TokenNumber,
+                    patientName = patientNamePayment,
+                    amount = bill.TotalAmount,
+                    mode = dto.PaymentMode
+                });
+
             return Ok(new { success = true, message = "Payment recorded and bill generated" });
         }
 
@@ -663,6 +705,10 @@ namespace MediCore.API.Modules.OPD.Controllers
 
                 _context.Appointments.Add(appointment);
                 await _context.SaveChangesAsync();
+
+                // Real-time notification: New Appointment (Receptionist/Doctor)
+                await _hubContext.Clients.Group("receptionist")
+                    .SendAsync("AppointmentStatusChanged", new { id = appointment.Id, status = "Scheduled", tokenNumber = appointment.TokenNumber });
 
                 return Ok(new
                 {

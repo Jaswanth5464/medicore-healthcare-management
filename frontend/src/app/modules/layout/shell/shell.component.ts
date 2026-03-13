@@ -2,6 +2,7 @@ import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { SignalRService, Notification } from '../../../core/services/signalr.service';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
@@ -86,13 +87,45 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
           </div>
 
           <div class="header-right">
-            <button class="header-icon-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-              <span class="notification-badge">3</span>
-            </button>
+            <div class="notification-wrapper">
+              <button class="header-icon-btn" (click)="toggleNotifications($event)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                <span class="notification-badge" *ngIf="signalR.unreadCount() > 0">
+                  {{ signalR.unreadCount() }}
+                </span>
+              </button>
+
+              <!-- Notifications Dropdown -->
+              <div class="notifications-dropdown" *ngIf="showNotifications()" (click)="$event.stopPropagation()">
+                <div class="dropdown-header">
+                  <h3>Notifications</h3>
+                  <button (click)="signalR.clearAll()">Clear All</button>
+                </div>
+                <div class="dropdown-body">
+                  <div *ngIf="signalR.notifications().length === 0" class="no-notifications">
+                    No new notifications
+                  </div>
+                  <div *ngFor="let n of signalR.notifications()" 
+                       class="notification-item" 
+                       [class.unread]="!n.isRead"
+                       (click)="markRead(n)">
+                    <div class="notif-icon" [class]="n.type">
+                      <svg *ngIf="n.type === 'NEW_REQUEST'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                      <svg *ngIf="n.type === 'CHECKED_IN'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      <svg *ngIf="n.type === 'LAB_READY'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    </div>
+                    <div class="notif-content">
+                      <p class="notif-msg">{{ n.message }}</p>
+                      <span class="notif-time">{{ n.timestamp | date:'shortTime' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="user-menu">
               <div class="user-avatar-sm">{{ userInitials() }}</div>
               <div class="user-meta">
@@ -279,7 +312,66 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
       width: 16px; height: 16px; background: #ef4444;
       border-radius: 50%; font-size: 9px; color: white;
       font-weight: 700; display: flex; align-items: center; justify-content: center;
+      border: 2px solid white;
     }
+
+    .notification-wrapper { position: relative; }
+
+    .notifications-dropdown {
+      position: absolute; top: calc(100% + 10px); right: 0;
+      width: 320px; background: white; border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+      border: 1px solid #e2e8f0; z-index: 100; overflow: hidden;
+      animation: slideIn 0.2s ease-out;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .dropdown-header {
+      padding: 14px 16px; border-bottom: 1px solid #f1f5f9;
+      display: flex; align-items: center; justify-content: space-between;
+      background: #f8fafc;
+    }
+    .dropdown-header h3 { font-size: 14px; font-weight: 700; color: #0f172a; }
+    .dropdown-header button { 
+      font-size: 12px; color: #3b82f6; background: none; border: none; cursor: pointer;
+      font-weight: 500;
+    }
+
+    .dropdown-body { max-height: 380px; overflow-y: auto; }
+
+    .no-notifications {
+      padding: 30px 20px; text-align: center; color: #94a3b8; font-size: 13px;
+    }
+
+    .notification-item {
+      display: flex; gap: 12px; padding: 12px 16px; 
+      border-bottom: 1px solid #f1f5f9; cursor: pointer;
+      transition: background 0.2s; position: relative;
+    }
+    .notification-item:hover { background: #f8fafc; }
+    .notification-item.unread { background: #f0f7ff; }
+    .notification-item.unread::before {
+      content: ''; position: absolute; left: 6px; top: 22px;
+      width: 6px; height: 6px; background: #3b82f6; border-radius: 50%;
+    }
+
+    .notif-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; background: #f1f5f9; color: #64748b;
+    }
+    .notif-icon svg { width: 16px; height: 16px; }
+    .notif-icon.NEW_REQUEST { background: #ecfdf5; color: #10b981; }
+    .notif-icon.CHECKED_IN { background: #eff6ff; color: #3b82f6; }
+    .notif-icon.LAB_READY { background: #fef2f2; color: #ef4444; }
+
+    .notif-content { flex: 1; }
+    .notif-msg { font-size: 13px; color: #1e293b; line-height: 1.4; margin-bottom: 2px; }
+    .notif-time { font-size: 11px; color: #94a3b8; }
 
     .user-menu {
       display: flex; align-items: center; gap: 10px;
@@ -334,8 +426,25 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 export class ShellComponent {
   sidebarCollapsed = signal(false);
   mobileMenuOpen = signal(false);
+  showNotifications = signal(false);
 
-  constructor(public authService: AuthService, private sanitizer: DomSanitizer) {}
+  constructor(
+    public authService: AuthService, 
+    public signalR: SignalRService,
+    private sanitizer: DomSanitizer
+  ) {
+    // Close notifications on click outside
+    window.addEventListener('click', () => this.showNotifications.set(false));
+  }
+
+  toggleNotifications(event: MouseEvent) {
+    event.stopPropagation();
+    this.showNotifications.set(!this.showNotifications());
+  }
+
+  markRead(n: Notification) {
+    this.signalR.markAsRead(n.id);
+  }
 
   safe(html: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(html);

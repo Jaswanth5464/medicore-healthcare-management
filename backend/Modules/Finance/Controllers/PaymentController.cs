@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MediCore.API.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using MediCore.API.Hubs;
 
 namespace MediCore.API.Modules.Finance.Controllers
 {
@@ -10,10 +12,12 @@ namespace MediCore.API.Modules.Finance.Controllers
     public class PaymentController : ControllerBase
     {
         private readonly MediCoreDbContext _context;
+        private readonly IHubContext<MediCoreHub> _hubContext;
 
-        public PaymentController(MediCoreDbContext context)
+        public PaymentController(MediCoreDbContext context, IHubContext<MediCoreHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         // POST api/payment/create-order
@@ -69,6 +73,16 @@ namespace MediCore.API.Modules.Finance.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // Real-time notification: Payment Received
+            var patientName = await _context.Users.Where(u => u.Id == bill.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
+            await _hubContext.Clients.Group("receptionist")
+                .SendAsync("PaymentReceived", new { 
+                    billId = bill.Id, 
+                    patientName = patientName, 
+                    amount = bill.TotalAmount,
+                    mode = bill.PaymentMode
+                });
 
             return Ok(new { success = true, message = "Payment verified successfully" });
         }

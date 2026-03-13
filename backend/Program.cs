@@ -10,6 +10,7 @@ using System.Text;
 using MediCore.API.Services;
 
 using MediCore.API.Infrastructure.Filters;
+using MediCore.API.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -101,6 +102,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddSingleton<IEmailService, EmailService>();
+builder.Services.AddSignalR();
 
 // ─── CORS ──────────────────────────────────────────────────────
 // Allows Angular running on port 4200 to call this API
@@ -149,5 +151,6 @@ app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<MediCoreHub>("/hubs/medicore");
 
 app.Run();

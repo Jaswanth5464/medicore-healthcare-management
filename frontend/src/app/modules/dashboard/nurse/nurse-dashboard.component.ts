@@ -6,13 +6,14 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AppointmentStateService } from '../../../core/services/appointment-state.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
 
 // const BASE_URL = 'https://localhost:7113';
 
 @Component({
   selector: 'app-nurse-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, HospitalChatComponent],
   template: `
     <div class="nurse-dash">
       <div class="header">
@@ -25,7 +26,24 @@ import { ConfigService } from '../../../core/services/config.service';
         </div>
       </div>
 
-      <div class="grid">
+      <!-- Navigation Tabs -->
+      <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <button [style.background]="activeView() === 'vitals' ? '#111827' : '#fff'" 
+                [style.color]="activeView() === 'vitals' ? '#fff' : '#6b7280'"
+                style="padding: 10px 20px; border: 1px solid #e5e7eb; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"
+                (click)="activeView.set('vitals')">
+          OPD Vitals Console
+        </button>
+        <button [style.background]="activeView() === 'chat' ? '#111827' : '#fff'" 
+                [style.color]="activeView() === 'chat' ? '#fff' : '#6b7280'"
+                style="padding: 10px 20px; border: 1px solid #e5e7eb; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"
+                (click)="activeView.set('chat')">
+          Staff Chat
+        </button>
+      </div>
+
+      <ng-container *ngIf="activeView() === 'vitals'">
+        <div class="grid">
         <div class="list-panel">
           <div class="panel-head">
             <h3>Patients in Queue</h3>
@@ -99,6 +117,13 @@ import { ConfigService } from '../../../core/services/config.service';
           </div>
         </div>
       </div>
+      </ng-container>
+
+      <ng-container *ngIf="activeView() === 'chat'">
+        <div style="height: calc(100vh - 250px); background: #fff; border-radius: 16px; overflow: hidden; border: 1px solid #e5e7eb;">
+          <app-hospital-chat></app-hospital-chat>
+        </div>
+      </ng-container>
     </div>
   `,
   styles: [`
@@ -161,6 +186,7 @@ export class NurseDashboardComponent implements OnInit {
   private readonly BASE_URL = this.config.baseApiUrl;
   activePatient = signal<any>(null);
   saving = signal(false);
+  activeView = signal<'vitals' | 'chat'>('vitals');
 
   vitals = {
     bloodPressure: '',

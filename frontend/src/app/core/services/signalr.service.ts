@@ -18,6 +18,7 @@ export interface ChatMessage {
   toUserId?: string;
   groupName?: string;
   message: string;
+  imageUrl?: string;
   sentAt: Date;
 }
 
@@ -90,12 +91,8 @@ export class SignalRService {
     
     // join group for specific roles
     if (user.roles?.includes('Receptionist') || user.roles?.includes('SuperAdmin') || user.roles?.includes('HospitalAdmin')) {
-      this.hubConnection.invoke('JoinGroup', 'receptionist');
+      this.hubConnection.invoke('JoinGroup', 'receptionist-group');
     }
-    
-    // If it's a doctor, we might need the DoctorProfileId. 
-    // For SignalR, the backend triggers doctor-{doctorProfileId}.
-    // We could either join that here if we have it, or trigger it from the dashboard.
   }
 
   private registerEvents() {
@@ -162,10 +159,11 @@ export class SignalRService {
     });
 
     // Listen for Chat Messages
-    this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, message: string) => {
+    this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, message: string, imageUrl?: string) => {
       this.addChatMessage({
         fromUserId,
         message,
+        imageUrl,
         sentAt: new Date()
       });
     });
@@ -221,9 +219,9 @@ export class SignalRService {
   }
 
   // Chat Methods
-  async sendChatMessage(toUserId: string, message: string) {
+  async sendChatMessage(toUserId: string, message: string, imageUrl?: string) {
     if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
-      await this.hubConnection.invoke('SendChatMessage', toUserId, message);
+      await this.hubConnection.invoke('SendChatMessage', toUserId, message, imageUrl);
     }
   }
 

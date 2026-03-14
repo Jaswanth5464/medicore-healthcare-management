@@ -5,13 +5,14 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
 
 // const BASE_URL = 'https://localhost:7113';
 
 @Component({
   selector: 'app-finance-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, HospitalChatComponent],
   template: `
     <div class="finance-dash">
       <div class="header">
@@ -27,82 +28,106 @@ import { ConfigService } from '../../../core/services/config.service';
         </div>
       </div>
 
-      <div class="stats-row">
-        <div class="stat" (click)="filterStatus.set('All')" [class.active]="filterStatus() === 'All'">
-          <div class="stat-num">{{ bills().length }}</div>
-          <div class="stat-lbl">Total Bills</div>
-        </div>
-        <div class="stat pending" (click)="filterStatus.set('Pending')" [class.active]="filterStatus() === 'Pending'">
-          <div class="stat-num">{{ pendingCount() }}</div>
-          <div class="stat-lbl">Pending Payment</div>
-        </div>
-        <div class="stat paid" (click)="filterStatus.set('Paid')" [class.active]="filterStatus() === 'Paid'">
-          <div class="stat-num">{{ paidCount() }}</div>
-          <div class="stat-lbl">Paid Successfully</div>
-        </div>
+      <!-- Navigation Tabs -->
+      <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <button [style.background]="activeView() === 'billing' ? '#4f46e5' : '#fff'" 
+                [style.color]="activeView() === 'billing' ? '#fff' : '#64748b'"
+                style="padding: 10px 20px; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"
+                (click)="activeView.set('billing')">
+          Billing & Invoices
+        </button>
+        <button [style.background]="activeView() === 'chat' ? '#4f46e5' : '#fff'" 
+                [style.color]="activeView() === 'chat' ? '#fff' : '#64748b'"
+                style="padding: 10px 20px; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"
+                (click)="activeView.set('chat')">
+          Staff Chat
+        </button>
       </div>
 
-      <div class="grid-layout">
-        <div class="main-panel">
-          <div class="panel-header">
-            <h3>Recent Invoices</h3>
-            <div class="filters">
-              <input type="text" placeholder="Search by patient..." [(ngModel)]="searchQuery">
-              <select [(ngModel)]="filterStatus">
-                <option value="All">All Status</option>
-                <option value="Pending">Pending</option>
-                <option value="Paid">Paid</option>
-                <option value="Waived">Waived</option>
-              </select>
+      <ng-container *ngIf="activeView() === 'billing'">
+        <div class="stats-row">
+          <div class="stat" (click)="filterStatus.set('All')" [class.active]="filterStatus() === 'All'">
+            <div class="stat-num">{{ bills().length }}</div>
+            <div class="stat-lbl">Total Bills</div>
+          </div>
+          <div class="stat pending" (click)="filterStatus.set('Pending')" [class.active]="filterStatus() === 'Pending'">
+            <div class="stat-num">{{ pendingCount() }}</div>
+            <div class="stat-lbl">Pending Payment</div>
+          </div>
+          <div class="stat paid" (click)="filterStatus.set('Paid')" [class.active]="filterStatus() === 'Paid'">
+            <div class="stat-num">{{ paidCount() }}</div>
+            <div class="stat-lbl">Paid Successfully</div>
+          </div>
+        </div>
+
+        <div class="grid-layout">
+          <div class="main-panel">
+            <div class="panel-header">
+              <h3>Recent Invoices</h3>
+              <div class="filters">
+                <input type="text" placeholder="Search by patient..." [(ngModel)]="searchQuery">
+                <select [(ngModel)]="filterStatus">
+                  <option value="All">All Status</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Waived">Waived</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Bill #</th>
+                    <th>Date</th>
+                    <th>Patient</th>
+                    <th>Doctor</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Payment Type</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let b of filteredBills()">
+                    <td class="bill-no">#{{ b.billNumber }}</td>
+                    <td>{{ formatDate(b.createdAt) }}</td>
+                    <td>
+                      <div class="patient-blob">
+                        <strong>{{ b.patientName }}</strong>
+                        <span>{{ b.patientPhone }}</span>
+                      </div>
+                    </td>
+                    <td>{{ b.doctorName }}</td>
+                    <td class="amount">₹{{ b.totalAmount }}</td>
+                    <td>
+                      <span class="status-chip" [class]="b.status.toLowerCase()">{{ b.status }}</span>
+                    </td>
+                    <td>{{ b.paymentMode || '—' }}</td>
+                    <td>
+                      <button *ngIf="b.status === 'Pending'" class="pay-btn" (click)="openPaymentModal(b)">Collect Payment</button>
+                      <button class="print-btn" (click)="printBill(b)">Print</button>
+                      <button class="email-btn" (click)="emailInvoice(b)" [disabled]="emailLoading() === b.id">
+                        {{ emailLoading() === b.id ? 'Sending...' : 'Email' }}
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="filteredBills().length === 0">
+                    <td colspan="8" class="no-data">No bills found for the selected criteria.</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
-
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Bill #</th>
-                  <th>Date</th>
-                  <th>Patient</th>
-                  <th>Doctor</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Payment Type</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let b of filteredBills()">
-                  <td class="bill-no">#{{ b.billNumber }}</td>
-                  <td>{{ formatDate(b.createdAt) }}</td>
-                  <td>
-                    <div class="patient-blob">
-                      <strong>{{ b.patientName }}</strong>
-                      <span>{{ b.patientPhone }}</span>
-                    </div>
-                  </td>
-                  <td>{{ b.doctorName }}</td>
-                  <td class="amount">₹{{ b.totalAmount }}</td>
-                  <td>
-                    <span class="status-chip" [class]="b.status.toLowerCase()">{{ b.status }}</span>
-                  </td>
-                  <td>{{ b.paymentMode || '—' }}</td>
-                  <td>
-                    <button *ngIf="b.status === 'Pending'" class="pay-btn" (click)="openPaymentModal(b)">Collect Payment</button>
-                    <button class="print-btn" (click)="printBill(b)">Print</button>
-                    <button class="email-btn" (click)="emailInvoice(b)" [disabled]="emailLoading() === b.id">
-                      {{ emailLoading() === b.id ? 'Sending...' : 'Email' }}
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="filteredBills().length === 0">
-                  <td colspan="8" class="no-data">No bills found for the selected criteria.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
         </div>
-      </div>
+      </ng-container>
+
+      <ng-container *ngIf="activeView() === 'chat'">
+        <div style="height: calc(100vh - 250px); background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);">
+          <app-hospital-chat></app-hospital-chat>
+        </div>
+      </ng-container>
 
       <!-- Payment Modal -->
       <div class="modal-overlay" *ngIf="showPaymentModal()">
@@ -213,6 +238,7 @@ export class FinanceDashboardComponent implements OnInit {
   bills = signal<any[]>([]);
   filterStatus = signal('All');
   searchQuery = '';
+  activeView = signal<'billing' | 'chat'>('billing');
   
   todayRevenue = signal(0);
   pendingCount = signal(0);

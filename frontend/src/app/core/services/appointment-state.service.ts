@@ -33,6 +33,7 @@ export interface CalendarSlot {
   displayTime: string;
   status: 'Available' | 'Booked' | 'CheckedIn' | 'WithDoctor' | 'Completed' | 'NoShow' | 'WalkIn' | 'Unavailable' | 'Cancelled';
   appointmentId?: number;
+  patientUserId?: string;
   patientName?: string;
   tokenNumber?: string;
   visitType?: string;

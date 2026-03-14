@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { PatientDoctorChatComponent } from '../../communication/chat/patient-doctor-chat.component';
 
 // const BASE_URL = 'https://localhost:7113';
 
@@ -14,7 +15,7 @@ declare var QRCode: any;
 @Component({
   selector: 'app-patient-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PatientDoctorChatComponent],
   template: `
     <div class="patient-dash">
       <div class="header">
@@ -110,10 +111,25 @@ declare var QRCode: any;
                   QR Slip
                 </button>
 
+                <button class="action-btn-sm" (click)="selectedChatDoctor.set({id: a.doctorUserId, name: a.doctorName})" title="Chat with Doctor">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  Chat
+                </button>
+
                 <button class="text-btn danger" style="margin-left:auto; color:#ef4444; background:none; border:none; cursor:pointer;" (click)="cancelAppt(a)">Cancel</button>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- CHAT OVERLAY -->
+        <div class="chat-overlay" *ngIf="selectedChatDoctor()" style="position:fixed; bottom:20px; right:20px; width:350px; z-index:1000;">
+          <app-patient-doctor-chat 
+            [otherUserId]="selectedChatDoctor().id" 
+            [otherUserName]="selectedChatDoctor().name"
+            [isMini]="true"
+            (close)="selectedChatDoctor.set(null)">
+          </app-patient-doctor-chat>
         </div>
 
         <!-- PAST -->
@@ -743,6 +759,7 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
   activeTab = signal<'upcoming' | 'past' | 'book' | 'bills' | 'profile'>('upcoming');
   loading = signal(true);
   selectedBillForPrint = signal<any>(null);
+  selectedChatDoctor = signal<any>(null);
 
   upcoming = signal<any[]>([]);
   past = signal<any[]>([]);

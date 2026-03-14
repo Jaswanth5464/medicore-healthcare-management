@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { AppointmentCalendarComponent } from './appointment-calendar.component';
 import { AppointmentStateService } from '../../../core/services/appointment-state.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
 
 interface AppointmentRequest {
   id: number;
@@ -42,7 +43,7 @@ import { ConfigService } from '../../../core/services/config.service';
 @Component({
   selector: 'app-receptionist-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgSwitch, NgSwitchCase, AppointmentCalendarComponent],
+  imports: [CommonModule, FormsModule, NgSwitch, NgSwitchCase, AppointmentCalendarComponent, HospitalChatComponent],
   template: `
     <div class="recep-dash">
       <!-- Header -->
@@ -312,6 +313,13 @@ import { ConfigService } from '../../../core/services/config.service';
             </div>
           </div>
         </section>
+
+        <!-- STAFF CHAT TAB -->
+        <section *ngSwitchCase="'Staff Chat'" class="tab-section">
+          <div style="height: calc(100vh - 220px);">
+            <app-hospital-chat></app-hospital-chat>
+          </div>
+        </section>
       </ng-container>
 
       <!-- Convert Modal -->
@@ -543,7 +551,7 @@ export class ReceptionistDashboardComponent implements OnInit {
   private readonly config = inject(ConfigService);
   private readonly BASE_URL = this.config.baseApiUrl;
   
-  tabs = ['Calendar', 'OPD Queue', 'Requests', 'Walk-in', 'Cash Payments'];
+  tabs = ['Calendar', 'OPD Queue', 'Requests', 'Walk-in', 'Cash Payments', 'Staff Chat'];
   activeTab = signal('OPD Queue');
   refreshInterval: any;
   calledPatientId = signal<number | null>(null);

@@ -470,7 +470,11 @@ export class AppointmentCalendarComponent implements OnInit, OnDestroy {
     this.popup.set({ slot, doctorProfileId: row.doctorProfileId, doctorName: row.doctorName, x: this.popupX, y: this.popupY });
 
     if (this.mode === 'doctor' && slot.appointmentId) {
-      this.patientSelected.emit({ appointmentId: slot.appointmentId, patientName: slot.patientName });
+      this.patientSelected.emit({ 
+        appointmentId: slot.appointmentId, 
+        patientName: slot.patientName,
+        patientUserId: slot.patientUserId
+      });
     }
   }
 

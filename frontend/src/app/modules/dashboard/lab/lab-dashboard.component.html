@@ -30,6 +30,9 @@
     <button class="tab-btn" [class.active]="activeTab() === 'tests'" (click)="activeTab.set('tests')">
       Test Registry
     </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'chat'" (click)="activeTab.set('chat')">
+      Staff Chat
+    </button>
   </div>
 
   <div class="content-area">
@@ -113,6 +116,12 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+    <!-- CHAT TAB -->
+    <div *ngIf="activeTab() === 'chat'" class="tab-panel">
+      <div style="height: calc(100vh - 250px);">
+        <app-hospital-chat></app-hospital-chat>
       </div>
     </div>
   </div>

@@ -5,6 +5,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
 
 interface User {
   id: number;
@@ -27,7 +28,7 @@ interface UserListResponse {
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, HospitalChatComponent],
   template: `
     <div class="admin">
 
@@ -88,6 +89,12 @@ interface UserListResponse {
           </svg>
           Leave Requests
           <span class="page-tab-count" *ngIf="pendingLeavesCount() > 0" style="background:#ef4444;color:#fff;">{{ pendingLeavesCount() }}</span>
+        </button>
+        <button class="page-tab" [class.active]="activePage() === 'hospital-chat'" (click)="activePage.set('hospital-chat')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-10.8 8.5 8.5 0 0 1 7.6 11.7z"/>
+          </svg>
+          Staff Chat
         </button>
       </div>
 
@@ -727,6 +734,13 @@ interface UserListResponse {
         </div>
       </div>
     </ng-container>
+  </div>
+</ng-container>
+
+<!-- HOSPITAL CHAT PAGE -->
+<ng-container *ngIf="activePage() === 'hospital-chat'">
+  <div class="section-card" style="height: calc(100vh - 200px); padding: 0; overflow: hidden;">
+    <app-hospital-chat></app-hospital-chat>
   </div>
 </ng-container>
 
@@ -1474,7 +1488,7 @@ export class AdminDashboardComponent implements OnInit {
   isEditing = signal(false);
   selectedUser = signal<User | null>(null);
   activeTab = signal('all');
-  activePage = signal<'users' | 'departments' | 'doctors' | 'reports' | 'leaves'>('users');
+  activePage = signal<'users' | 'departments' | 'doctors' | 'reports' | 'leaves' | 'hospital-chat'>('users');
   searchQuery = signal('');
   toastMsg = signal('');
   modalError = signal('');

@@ -6,15 +6,16 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AppointmentStateService } from '../../../core/services/appointment-state.service';
 import { AppointmentCalendarComponent } from '../receptionist/appointment-calendar.component';
 import { NotificationService } from '../../../core/services/notification.service';
-
 import { ConfigService } from '../../../core/services/config.service';
+import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
+import { PatientDoctorChatComponent } from '../../communication/chat/patient-doctor-chat.component';
 
 // const BASE_URL = 'https://localhost:7113';
 
 @Component({
   selector: 'app-doctor-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, AppointmentCalendarComponent],
+  imports: [CommonModule, FormsModule, AppointmentCalendarComponent, HospitalChatComponent, PatientDoctorChatComponent],
   template: `
     <div class="doctor-dash">
       <div class="header">
@@ -45,6 +46,9 @@ import { ConfigService } from '../../../core/services/config.service';
           </button>
           <button [class.active]="activeTab() === 'performance'" (click)="loadPerformance()">
             Performance
+          </button>
+          <button [class.active]="activeTab() === 'hospital-chat'" (click)="activeTab.set('hospital-chat')">
+            Staff Chat
           </button>
         </div>
 
@@ -96,8 +100,22 @@ import { ConfigService } from '../../../core/services/config.service';
           <!-- CONSULTATION TAB -->
           <div *ngIf="activeTab() === 'consultation'" class="consult-view fade-in">
             <div class="consult-header">
-              <h2>Consultation — {{ consultationPatientName() }}</h2>
+              <div style="display:flex; align-items:center; gap:16px;">
+                <h2>Consultation — {{ consultationPatientName() }}</h2>
+                <button class="small-btn pulse" (click)="activePatientChat.set({id: activePatientUserId, name: consultationPatientName()})">
+                  💬 Chat with Patient
+                </button>
+              </div>
               <span class="patient-id">Appt ID: #{{ activeAppointmentId() }}</span>
+            </div>
+
+            <div class="chat-overlay" *ngIf="activePatientChat()" style="position:fixed; bottom:20px; right:20px; width:350px; z-index:1000;">
+              <app-patient-doctor-chat 
+                [otherUserId]="activePatientChat().id" 
+                [otherUserName]="activePatientChat().name"
+                [isMini]="true"
+                (close)="activePatientChat.set(null)">
+              </app-patient-doctor-chat>
             </div>
 
             <div class="consult-grid">
@@ -202,6 +220,11 @@ import { ConfigService } from '../../../core/services/config.service';
               <button class="cancel-btn" (click)="endConsultation()">Close</button>
               <button class="complete-btn" (click)="markCompleted()">Mark as Completed (Auto-Bill)</button>
             </div>
+          </div>
+
+          <!-- HOSPITAL CHAT TAB -->
+          <div *ngIf="activeTab() === 'hospital-chat'" class="fade-in" style="height: calc(100vh - 200px);">
+             <app-hospital-chat></app-hospital-chat>
           </div>
 
         </div>
@@ -314,7 +337,11 @@ export class DoctorDashboardComponent implements OnInit {
   private readonly config = inject(ConfigService);
   private readonly BASE_URL = this.config.baseApiUrl;
   
-  activeTab = signal<'schedule' | 'consultation' | 'leaves' | 'performance'>('schedule');
+  activeTab = signal<'schedule' | 'consultation' | 'leaves' | 'performance' | 'hospital-chat' | 'patient-chat'>('schedule');
+  viewingApptDate = signal('');
+  consultationData = signal<any>(null);
+  activePatientUserId: string | null = null;
+  activePatientChat = signal<any>(null);
   performanceStats = signal<any>(null);
   myProfile = signal<any>(null);
   loadingProfile = signal(true);
@@ -380,9 +407,10 @@ export class DoctorDashboardComponent implements OnInit {
     });
   }
 
-  startConsultation(event: { appointmentId: number, patientName: string }) {
+  startConsultation(event: { appointmentId: number, patientName: string, patientUserId?: string }) {
     this.activeAppointmentId.set(event.appointmentId);
     this.consultationPatientName.set(event.patientName);
+    this.activePatientUserId = event.patientUserId || null;
 
     // Reset forms
     this.vitals = { bloodPressure: '', heartRateBpm: null, temperatureFahrenheit: null, weightKg: null, spO2: null };

@@ -4,13 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
 
 // const BASE_URL = 'https://localhost:7113';
 
 @Component({
   selector: 'app-lab-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, HospitalChatComponent],
   templateUrl: './lab-dashboard.component.html',
   styleUrls: ['./lab-dashboard.component.css']
 })
@@ -20,7 +21,7 @@ export class LabDashboardComponent implements OnInit {
   private http = inject(HttpClient);
   private ns = inject(NotificationService);
 
-  activeTab = signal<'queue' | 'tests'>('queue');
+  activeTab = signal<'queue' | 'tests' | 'chat'>('queue');
   
   // Data
   queueStr = signal<any[]>([]);

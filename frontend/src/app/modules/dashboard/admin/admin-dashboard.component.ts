@@ -676,7 +676,6 @@ interface UserListResponse {
               Calculated from Appointments, Pharmacy & Lab
            </div>
        </div>
-        </div>
         
       <!-- Audit Logs Section -->
       <div style="margin-top:40px;">

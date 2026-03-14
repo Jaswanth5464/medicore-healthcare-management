@@ -163,14 +163,13 @@ export class SignalRService {
       });
     });
 
-    // Listen for Chat Messages
-    this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, message: string, imageUrl?: string) => {
+    // Listen for Chat Messages — Hub now sends (fromUserId, toUserId, message, imageUrl)
+    this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, toUserId: string, message: string, imageUrl?: string) => {
       // Ignore messages if DND is active
       if (this.isDndActive()) return;
-      const currentUserId = this.authService.currentUser()?.id;
       this.addChatMessage({
         fromUserId: String(fromUserId),
-        toUserId: String(currentUserId),
+        toUserId: String(toUserId),
         message,
         imageUrl,
         sentAt: new Date(),
@@ -206,12 +205,15 @@ export class SignalRService {
       this.addNotification({
         id: Math.random().toString(36),
         type: 'EMERGENCY',
-        message: `🚨 EMERGENCY at ${location}: ${details}`,
+        message: `EMERGENCY at ${location}: ${details}`,
         timestamp: new Date(),
         data: { location, details },
         isRead: false
       });
     });
+
+    // Register WebRTC signaling events
+    this.registerWebRtcEvents();
   }
 
   private addNotification(notif: Notification) {

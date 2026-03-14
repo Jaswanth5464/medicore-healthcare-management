@@ -41,22 +41,28 @@ import { CallOverlayComponent } from './call-overlay.component';
           <button class="call-btn video" (click)="startCall('video')" title="Video Call">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
           </button>
-          <!-- 🔒 Encrypted badge -->
-          <span class="enc-badge" title="Messages are end-to-end encrypted">🔒 E2E</span>
-          <button class="close-btn" (click)="close.emit()" title="Close">✕</button>
+          <!-- Secure E2E badge -->
+          <span class="enc-badge" title="Messages are end-to-end encrypted">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Secure
+          </span>
+          <button class="close-btn" (click)="close.emit()" title="Close">&#x2715;</button>
         </div>
       </div>
 
       <div class="messages-area" #scrollMe>
         <div *ngIf="activeMessages().length === 0" class="no-messages">
-          <p>No messages yet. Say hello 👋</p>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:#cbd5e1">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <p>No messages yet. Start the conversation.</p>
         </div>
         <div *ngFor="let msg of activeMessages()"
              class="message-wrapper"
              [class.sent]="isSentByMe(msg)">
           <div class="message-bubble">
             <img *ngIf="msg.imageUrl" [src]="msg.imageUrl" class="chat-img" (click)="lightboxUrl = msg.imageUrl!" />
-            <p *ngIf="msg.message">{{ msg.message }}</p>
+            <p *ngIf="msg.message">{{ getDecrypted(msg) }}</p>
             <span class="message-time">{{ msg.sentAt | date:'shortTime' }}</span>
           </div>
         </div>
@@ -205,6 +211,9 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
   private crypto = inject(CryptoService);
 
+  /** Decrypted text cache: message-id → plaintext */
+  decryptedTexts = signal<Map<number | string, string>>(new Map());
+
   activeMessages = computed(() => {
     const targetId = this.otherUserId;
     const currentUserId = String(this.auth.currentUser()?.id);
@@ -215,6 +224,23 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
       (String(m.fromUserId) === currentUserId && String(m.toUserId) === String(targetId))
     ).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   });
+
+  /** Returns decrypted text for a message, scheduling decryption if needed. */
+  getDecrypted(msg: ChatMessage): string {
+    const key = msg.id ?? msg.sentAt.toString();
+    const cache = this.decryptedTexts();
+    if (cache.has(key)) return cache.get(key)!;
+    // Return raw while decryption is in progress (starts first time)
+    if (msg.message?.startsWith('ENC:')) {
+      const myId = String(this.auth.currentUser()?.id);
+      const otherId = String(this.otherUserId);
+      this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
+        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, plain); return n; });
+      });
+      return 'Decrypting...';
+    }
+    return msg.message ?? '';
+  }
 
   constructor() {
     effect(() => { this.activeMessages(); this.scrollToBottom(); });

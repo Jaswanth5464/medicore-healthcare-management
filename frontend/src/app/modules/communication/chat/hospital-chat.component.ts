@@ -8,6 +8,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { SignalRService, ChatMessage } from '../../../core/services/signalr.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { CallOverlayComponent } from './call-overlay.component';
 
 const DEPT_ORDER: Record<string, number> = {
   Doctor: 1, Nurse: 2, Receptionist: 3, LabTechnician: 4,
@@ -36,18 +37,31 @@ const ROLE_COLOR: Record<string, string> = {
 @Component({
   selector: 'app-hospital-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CallOverlayComponent],
   template: `
     <div class="hub-root" [class.dnd-active]="signalR.isDndActive()">
+      <!-- Call Overlay -->
+      <app-call-overlay
+        *ngIf="showCall()"
+        [callerName]="selectedUser()?.fullName || 'Colleague'"
+        [callType]="callType()"
+        [callerId]="selectedUserId()!"
+        [isInitiator]="callInitiator()"
+        (callEnded)="showCall.set(false)">
+      </app-call-overlay>
 
       <!-- ========= SIDEBAR ========= -->
       <aside class="sidebar">
         <div class="sidebar-top">
           <div class="brand">
-            <span class="brand-icon">🏥</span>
+            <div class="brand-logo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
             <div>
-              <div class="brand-title">Clinical Comms</div>
-              <div class="brand-sub">MediCore Hub</div>
+              <div class="brand-title">Staff Messaging</div>
+              <div class="brand-sub">MediCore HMS</div>
             </div>
           </div>
 
@@ -83,7 +97,10 @@ const ROLE_COLOR: Record<string, string> = {
               </div>
               <div class="u-info">
                 <div class="u-name">{{ user.fullName }}</div>
-                <div class="u-sub">{{ isTypingTo(user.id) ? '✏️ typing...' : (isOnline(user.id) ? 'Online' : 'Offline') }}</div>
+                <div class="u-sub" [class.typing-text]="isTypingTo(user.id)">
+                  <ng-container *ngIf="isTypingTo(user.id)">typing...</ng-container>
+                  <ng-container *ngIf="!isTypingTo(user.id)">{{ isOnline(user.id) ? 'Online' : 'Offline' }}</ng-container>
+                </div>
               </div>
               <span *ngIf="getUnread(user.id) > 0" class="unread-pill">{{ getUnread(user.id) }}</span>
             </div>
@@ -99,11 +116,30 @@ const ROLE_COLOR: Record<string, string> = {
 
         <!-- No selection placeholder -->
         <div *ngIf="!selectedUserId()" class="placeholder">
-          <div class="ph-icon">💬</div>
-          <h2>MediCore Clinical Communication Hub</h2>
-          <p>Select a colleague from the left panel to start a conversation</p>
+          <div class="ph-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h2>MediCore Staff Messaging</h2>
+          <p>Select a colleague from the panel on the left to start a secure conversation</p>
           <div class="feature-pills">
-            <span>✅ Secure</span><span>📎 Media</span><span>🔔 Notifications</span><span>🚫 DND Mode</span>
+            <span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Encrypted
+            </span>
+            <span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2.12 2.12 0 1 1-3-3l9.19-9.19"/></svg>
+              File Sharing
+            </span>
+            <span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+              Video Calls
+            </span>
+            <span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              DND Mode
+            </span>
           </div>
         </div>
 
@@ -117,18 +153,30 @@ const ROLE_COLOR: Record<string, string> = {
             <div class="ch-info">
               <div class="ch-name">{{ selectedUser()?.fullName }}</div>
               <div class="ch-status" [class.online-text]="isOnline(selectedUser()?.id)">
-                {{ isTypingTo(selectedUser()?.id) ? '✏️ typing...' : (isOnline(selectedUser()?.id) ? '● Online' : '○ Offline') }}
+                <ng-container *ngIf="isTypingTo(selectedUser()?.id)">typing...</ng-container>
+                <ng-container *ngIf="!isTypingTo(selectedUser()?.id)">
+                  {{ isOnline(selectedUser()?.id) ? 'Online' : 'Offline' }}
+                </ng-container>
               </div>
             </div>
             <div class="ch-role-badge">{{ getRoleLabel(selectedUser()?.role) }}</div>
+            <!-- Call buttons -->
+            <button class="hdr-btn audio" (click)="startCall('audio')" title="Audio Call">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+            </button>
+            <button class="hdr-btn video" (click)="startCall('video')" title="Video Call">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+            </button>
           </div>
 
           <!-- Messages -->
           <div class="messages" #scrollMe>
             <div *ngIf="activeMessages().length === 0" class="msgs-empty">
               <div class="empty-bubble">
-                <span>👋</span>
-                <p>Say hello to {{ selectedUser()?.fullName }}!</p>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <p>No messages yet. Send a message to {{ selectedUser()?.fullName }}.</p>
               </div>
             </div>
 
@@ -169,7 +217,10 @@ const ROLE_COLOR: Record<string, string> = {
 
           <!-- DND banner -->
           <div *ngIf="signalR.isDndActive()" class="dnd-banner">
-            🚫 Do Not Disturb is ON – incoming messages are muted
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            </svg>
+            Do Not Disturb is ON — incoming messages are paused
             <button (click)="signalR.toggleDnd()">Disable</button>
           </div>
 
@@ -213,104 +264,128 @@ const ROLE_COLOR: Record<string, string> = {
     /* ── Root ── */
     .hub-root {
       display: flex; width: 100%; height: calc(100vh - 140px); min-height: 600px;
-      border-radius: 18px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-      border: 1px solid #e2e8f0; background: #fff;
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; background: #fff;
     }
     .hub-root.dnd-active { border: 2px solid #f59e0b; }
 
     /* ── Sidebar ── */
     .sidebar {
-      width: 300px; flex-shrink: 0; background: #0f172a; color: #e2e8f0;
+      width: 290px; flex-shrink: 0; background: #fff;
+      border-right: 1px solid #e2e8f0;
       display: flex; flex-direction: column; overflow: hidden;
     }
-    .sidebar-top { padding: 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); }
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .brand-icon { font-size: 24px; }
-    .brand-title { font-size: 13px; font-weight: 700; color: #f1f5f9; }
-    .brand-sub { font-size: 10px; color: #64748b; letter-spacing: 0.5px; text-transform: uppercase; }
+    .sidebar-top {
+      padding: 16px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #f1f5f9; background: #f8fafc;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }    .brand-logo {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: linear-gradient(135deg,#1d4ed8,#3b82f6);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .brand-logo svg { width: 18px; height: 18px; stroke: #fff; }
+    .brand-title { font-size: 13px; font-weight: 700; color: #0f172a; }
+    .brand-sub { font-size: 10px; color: #94a3b8; letter-spacing: 0.5px; text-transform: uppercase; }
 
     .dnd-btn {
-      display: flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 10px; border: 1px solid #334155;
-      background: transparent; color: #94a3b8; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;
+      display: flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0;
+      background: #fff; color: #64748b; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;
     }
     .dnd-btn svg { width: 14px; height: 14px; }
-    .dnd-btn:hover { border-color: #f59e0b; color: #f59e0b; }
-    .dnd-btn.on { background: #f59e0b22; border-color: #f59e0b; color: #fbbf24; }
+    .dnd-btn:hover { border-color: #f59e0b; color: #f59e0b; background: #fffbeb; }
+    .dnd-btn.on { background: #fffbeb; border-color: #f59e0b; color: #d97706; }
 
-    .search-wrap { position: relative; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-    .search-ico { position: absolute; left: 26px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: #475569; }
-    .search-input { width: 100%; padding: 10px 10px 10px 36px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #e2e8f0; font-size: 13px; outline: none; box-sizing: border-box; }
-    .search-input:focus { border-color: #3b82f6; }
-    .search-input::placeholder { color: #475569; }
+    .search-wrap { position: relative; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+    .search-ico { position: absolute; left: 24px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #94a3b8; }
+    .search-input {
+      width: 100%; padding: 9px 9px 9px 34px; background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 8px; color: #1e293b; font-size: 13px; outline: none; box-sizing: border-box; font-family: inherit;
+    }
+    .search-input:focus { border-color: #3b82f6; background: #fff; }
+    .search-input::placeholder { color: #94a3b8; }
 
     .user-list { flex: 1; overflow-y: auto; padding-bottom: 10px; }
     .user-list::-webkit-scrollbar { width: 4px; }
     .user-list::-webkit-scrollbar-track { background: transparent; }
-    .user-list::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .user-list::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
 
-    .dept-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #475569; padding: 16px 16px 6px; }
+    .dept-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      color: #94a3b8; padding: 14px 14px 5px; border-top: 1px solid #f1f5f9; margin-top: 4px;
+    }
 
     .user-row {
-      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
-      cursor: pointer; transition: all 0.18s; border-left: 3px solid transparent; position: relative;
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent;
     }
-    .user-row:hover { background: rgba(255,255,255,0.04); }
-    .user-row.active { background: rgba(59,130,246,0.12); border-left-color: #3b82f6; }
+    .user-row:hover { background: #f8fafc; }
+    .user-row.active { background: #eff6ff; border-left-color: #2563eb; }
 
     .u-avatar {
-      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; position: relative;
+      width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; position: relative;
       display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff;
     }
     .presence-dot {
-      position: absolute; bottom: 1px; right: 1px; width: 10px; height: 10px; border-radius: 50%;
-      background: #475569; border: 2px solid #0f172a;
+      position: absolute; bottom: -2px; right: -2px; width: 10px; height: 10px; border-radius: 50%;
+      background: #cbd5e1; border: 2px solid #fff;
     }
     .presence-dot.online { background: #22c55e; }
 
     .u-info { flex: 1; min-width: 0; }
-    .u-name { font-size: 13px; font-weight: 600; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .u-sub { font-size: 11px; color: #64748b; margin-top: 1px; }
+    .u-name { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .u-sub { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+    .typing-text { color: #3b82f6; font-weight: 600; }
     .unread-pill { background: #ef4444; color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 4px; flex-shrink: 0; }
 
-    .empty-list { display: flex; align-items: center; gap: 10px; padding: 24px 18px; color: #475569; font-size: 13px; }
-    .spin { width: 18px; height: 18px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+    .empty-list { display: flex; align-items: center; gap: 10px; padding: 24px 18px; color: #94a3b8; font-size: 13px; }
+    .spin { width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Chat Main ── */
     .chat-main {
       flex: 1; min-width: 0; display: flex; flex-direction: column; background: #f8fafc;
-      background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px); background-size: 22px 22px;
     }
 
     .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; text-align: center; padding: 40px; }
-    .ph-icon { font-size: 80px; filter: grayscale(1) opacity(0.2); }
-    .placeholder h2 { font-size: 22px; font-weight: 700; color: #1e293b; margin: 0; }
-    .placeholder p { font-size: 14px; color: #64748b; margin: 0; }
+    .ph-icon { width: 80px; height: 80px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .ph-icon svg { width: 40px; height: 40px; stroke: #2563eb; }
+    .placeholder h2 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0; }
+    .placeholder p { font-size: 14px; color: #64748b; margin: 0; max-width: 360px; }
     .feature-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
-    .feature-pills span { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .feature-pills span { display: flex; align-items: center; gap: 5px; background: #fff; color: #1e293b; border: 1px solid #e2e8f0; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .feature-pills span svg { width: 13px; height: 13px; flex-shrink: 0; }
 
     /* Chat header */
     .chat-header {
       padding: 14px 20px; background: #fff; border-bottom: 1px solid #e2e8f0;
-      display: flex; align-items: center; gap: 14px; flex-shrink: 0; z-index: 5;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0; z-index: 5;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
-    .ch-avatar { width: 42px; height: 42px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ch-avatar { width: 42px; height: 42px; border-radius: 10px; color: #fff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .ch-info { flex: 1; }
-    .ch-name { font-size: 16px; font-weight: 700; color: #0f172a; }
-    .ch-status { font-size: 12px; color: #64748b; }
-    .ch-status.online-text { color: #22c55e; font-weight: 600; }
-    .ch-role-badge { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .ch-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+    .ch-status { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+    .ch-status.online-text { color: #16a34a; font-weight: 600; }
+    .ch-status.online-text::before { content: ''; display: inline-block; width: 6px; height: 6px; background: #22c55e; border-radius: 50%; }
+    .ch-role-badge { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; flex-shrink: 0; letter-spacing: 0.3px; text-transform: uppercase; }
+    /* Call buttons in header */
+    .hdr-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; background: #f8fafc; }
+    .hdr-btn svg { width: 17px; height: 17px; }
+    .hdr-btn.audio { color: #16a34a; }
+    .hdr-btn.audio:hover { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .hdr-btn.video { color: #2563eb; }
+    .hdr-btn.video:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
 
     /* Messages area */
-    .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
     .messages::-webkit-scrollbar { width: 4px; }
     .messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
 
     .msgs-empty { display: flex; align-items: center; justify-content: center; flex: 1; }
-    .empty-bubble { background: #fff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 20px 32px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-    .empty-bubble span { font-size: 40px; }
-    .empty-bubble p { margin: 8px 0 0; color: #64748b; font-size: 14px; }
+    .empty-bubble { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px 36px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+    .empty-bubble svg { width: 36px; height: 36px; stroke: #cbd5e1; display: block; margin: 0 auto 12px; }
+    .empty-bubble p { margin: 0; color: #94a3b8; font-size: 14px; }
 
     /* Date separator */
     .date-sep { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
@@ -410,6 +485,9 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   previewUrl: string | null = null;
   lightboxUrl: string | null = null;
   isSending = signal(false);
+  showCall = signal(false);
+  callType = signal<'video' | 'audio'>('video');
+  callInitiator = signal(false);
   private typingTimeout: any = null;
 
   /** Department-grouped users after search */
@@ -445,6 +523,14 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   constructor() {
     this.loadStaff();
     effect(() => { this.activeMessages(); this.scrollToBottom(); });
+    // Listen for incoming calls
+    this.signalR.onWebRtcEvent('IncomingCall', (from: string, type: string) => {
+      if (this.selectedUserId() && String(from) === String(this.selectedUserId())) {
+        this.callType.set(type as 'video' | 'audio');
+        this.callInitiator.set(false);
+        this.showCall.set(true);
+      }
+    });
   }
 
   ngAfterViewChecked() { this.scrollToBottom(); }
@@ -464,6 +550,14 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
     this.selectedUser.set(user);
     this.signalR.activeChatPartner.set(user.id);
     this.loadHistory(user.id);
+  }
+
+  startCall(type: 'video' | 'audio') {
+    if (!this.selectedUserId()) return;
+    this.callType.set(type);
+    this.callInitiator.set(true);
+    this.showCall.set(true);
+    this.signalR.sendCallRequest(this.selectedUserId()!, type);
   }
 
   loadHistory(toUserId: string) {

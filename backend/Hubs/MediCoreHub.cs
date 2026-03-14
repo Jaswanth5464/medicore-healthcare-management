@@ -66,12 +66,12 @@ namespace MediCore.API.Hubs
         public async Task SendChatMessage(string toUserId, string encryptedMessage, string? imageUrl = null)
         {
             var fromUserId = Context.UserIdentifier ?? "Unknown";
-            // Relay to recipient
+            // Relay to recipient — they see: from=sender, to=recipient
             await Clients.Group($"user-{toUserId}")
-                .SendAsync("ReceiveChatMessage", fromUserId, encryptedMessage, imageUrl);
-            // Echo to all sender's connections (multi-device support)
+                .SendAsync("ReceiveChatMessage", fromUserId, toUserId, encryptedMessage, imageUrl);
+            // Echo to sender — they see: from=sender, to=recipient (same)
             await Clients.Group($"user-{fromUserId}")
-                .SendAsync("ReceiveChatMessage", fromUserId, encryptedMessage, imageUrl);
+                .SendAsync("ReceiveChatMessage", fromUserId, toUserId, encryptedMessage, imageUrl);
         }
 
         public async Task SendGroupMessage(string groupName, string message)

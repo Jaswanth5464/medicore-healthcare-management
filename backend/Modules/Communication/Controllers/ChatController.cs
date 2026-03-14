@@ -203,9 +203,9 @@ namespace MediCore.API.Modules.Communication.Controllers
             else if (!string.IsNullOrEmpty(dto.ToUserId))
             {
                 await _hubContext.Clients.Group($"user-{dto.ToUserId}")
-                    .SendAsync("ReceiveChatMessage", userId, dto.Message, dto.ImageUrl);
+                    .SendAsync("ReceiveChatMessage", userId, dto.ToUserId, dto.Message, dto.ImageUrl);
                 await _hubContext.Clients.Group($"user-{userId}")
-                    .SendAsync("ReceiveChatMessage", userId, dto.Message, dto.ImageUrl);
+                    .SendAsync("ReceiveChatMessage", userId, dto.ToUserId, dto.Message, dto.ImageUrl);
             }
 
             return Ok(new { success = true, data = message });

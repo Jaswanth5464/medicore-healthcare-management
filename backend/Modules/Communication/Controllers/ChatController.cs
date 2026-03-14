@@ -44,12 +44,13 @@ namespace MediCore.API.Modules.Communication.Controllers
 
             if (isPatient)
             {
-                // Patients see ONLY their confirmed doctors via DoctorProfile.UserId
+                // Patients see doctors they have current or past appointments with
+                var statuses = new[] { "Confirmed", "Scheduled", "CheckedIn", "Completed" };
                 var assignedDoctors = await _context.Appointments
                     .Include(a => a.DoctorProfile)
                         .ThenInclude(dp => dp.User)
                     .Where(a => a.PatientUserId == currentUserId
-                             && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
+                             && statuses.Contains(a.Status)
                              && a.DoctorProfile != null
                              && a.DoctorProfile.User != null)
                     .Select(a => new
@@ -87,10 +88,11 @@ namespace MediCore.API.Modules.Communication.Controllers
 
                 if (doctorProfile != null)
                 {
+                    var statuses = new[] { "Confirmed", "Scheduled", "CheckedIn", "Completed" };
                     var patients = await _context.Appointments
                         .Include(a => a.PatientUser)
                         .Where(a => a.DoctorProfileId == doctorProfile.Id
-                                 && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
+                                 && statuses.Contains(a.Status)
                                  && a.PatientUser != null)
                         .Select(a => new
                         {
@@ -134,17 +136,31 @@ namespace MediCore.API.Modules.Communication.Controllers
             var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (userId == null) return Unauthorized();
 
-            // Patient access guard: verify the other user is their assigned doctor
+            // Patient access: must have appointment with this doctor (current or completed)
             if (User.IsInRole("Patient") && !string.IsNullOrEmpty(withUserId))
             {
                 if (!int.TryParse(userId, out var patientId)) return Unauthorized();
+                var statuses = new[] { "Confirmed", "Scheduled", "CheckedIn", "Completed" };
                 var allowed = await _context.Appointments
                     .Include(a => a.DoctorProfile)
                     .AnyAsync(a => a.PatientUserId == patientId
-                                && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
+                                && statuses.Contains(a.Status)
                                 && a.DoctorProfile != null
                                 && a.DoctorProfile.UserId.ToString() == withUserId);
                 if (!allowed) return Forbid();
+            }
+
+            // Doctor access: must have appointment with this patient
+            if (User.IsInRole("Doctor") && !string.IsNullOrEmpty(withUserId) && int.TryParse(withUserId, out var patientIdForDoctor))
+            {
+                var doctorProfile = await _context.DoctorProfiles.FirstOrDefaultAsync(d => d.UserId.ToString() == userId);
+                if (doctorProfile != null)
+                {
+                    var statuses = new[] { "Confirmed", "Scheduled", "CheckedIn", "Completed" };
+                    var hasAppointment = await _context.Appointments
+                        .AnyAsync(a => a.DoctorProfileId == doctorProfile.Id && a.PatientUserId == patientIdForDoctor && statuses.Contains(a.Status));
+                    if (!hasAppointment) return Forbid();
+                }
             }
 
             var query = _context.ChatMessages.AsQueryable();
@@ -168,17 +184,31 @@ namespace MediCore.API.Modules.Communication.Controllers
             var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (userId == null) return Unauthorized();
 
-            // Patient access guard — allow same statuses as GetChatUsers (Confirmed, Scheduled, CheckedIn)
+            // Patient sending to doctor: must have appointment
             if (User.IsInRole("Patient") && !string.IsNullOrEmpty(dto.ToUserId))
             {
                 if (!int.TryParse(userId, out var patientId)) return Unauthorized();
+                var statuses = new[] { "Confirmed", "Scheduled", "CheckedIn", "Completed" };
                 var allowed = await _context.Appointments
                     .Include(a => a.DoctorProfile)
                     .AnyAsync(a => a.PatientUserId == patientId
-                                && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
+                                && statuses.Contains(a.Status)
                                 && a.DoctorProfile != null
                                 && a.DoctorProfile.UserId.ToString() == dto.ToUserId);
                 if (!allowed) return Forbid();
+            }
+
+            // Doctor sending to patient: must have appointment with that patient
+            if (User.IsInRole("Doctor") && !string.IsNullOrEmpty(dto.ToUserId) && int.TryParse(dto.ToUserId, out var targetPatientId))
+            {
+                var doctorProfile = await _context.DoctorProfiles.FirstOrDefaultAsync(d => d.UserId.ToString() == userId);
+                if (doctorProfile != null)
+                {
+                    var statuses = new[] { "Confirmed", "Scheduled", "CheckedIn", "Completed" };
+                    var hasAppointment = await _context.Appointments
+                        .AnyAsync(a => a.DoctorProfileId == doctorProfile.Id && a.PatientUserId == targetPatientId && statuses.Contains(a.Status));
+                    if (!hasAppointment) return Forbid();
+                }
             }
 
             // Message is stored as-is (client sends AES-GCM ciphertext)

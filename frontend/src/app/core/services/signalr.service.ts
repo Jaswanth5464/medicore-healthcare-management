@@ -308,7 +308,7 @@ export class SignalRService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ toUserId, message: message ?? '', imageUrl: imageUrl ?? null })
+        body: JSON.stringify({ toUserId: String(toUserId), message: message ?? '', imageUrl: imageUrl ?? null })
       });
       if (!res.ok) {
         const errText = await res.text();

@@ -336,7 +336,7 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
     this.isUploading.set(true);
     try {
-      await this.signalR.sendChatMessage(this.otherUserId, encrypted, imageUrl);
+      await this.signalR.sendChatMessage(String(this.otherUserId), encrypted, imageUrl);
 
       // Add plaintext optimistically so the sender sees their own message
       // immediately without waiting for decryption on the next render.

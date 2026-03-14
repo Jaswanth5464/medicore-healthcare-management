@@ -17,6 +17,35 @@ namespace MediCore.API.Modules.Finance.Controllers
             _context = context;
         }
 
+        [HttpGet("my-bills")]
+        public async Task<IActionResult> GetMyBills()
+        {
+            var userIdStr = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var bills = await _context.Bills
+                .Where(b => b.PatientUserId == userId)
+                .OrderByDescending(b => b.CreatedAt)
+                .Take(100)
+                .Select(b => new
+                {
+                    b.Id,
+                    b.BillNumber,
+                    b.BillSource,
+                    b.SubTotal,
+                    b.TotalAmount,
+                    b.Status,
+                    b.PaymentMode,
+                    b.CreatedAt,
+                    b.Items,
+                    b.PaidAt
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = bills });
+        }
+
         [HttpGet("payment-logs")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin")]
         public async Task<IActionResult> GetPaymentLogs([FromQuery] int limit = 100)

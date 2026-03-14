@@ -515,12 +515,13 @@
 .total-label { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; }
 .total-amount { font-size: 24px; font-weight: 800; }
 
-/* COUNTER TAB STYLES - PREMIUM OVERHAUL */
+/* COUNTER TAB STYLES - Professional Pharmaceutical Module */
 .counter-panel {
   padding: 0 !important;
-  background: #f1f5f9 !important;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 30%, #f0fdfa 100%) !important;
   box-shadow: none !important;
   border: none !important;
+  border-radius: 20px !important;
 }
 
 .counter-grid {
@@ -534,24 +535,25 @@
 .inventory-selector {
   background: white;
   border-radius: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #d1fae5;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 40px rgba(5, 150, 105, 0.08), 0 4px 12px rgba(0,0,0,0.04);
 }
 
 .title-group h3 {
   font-size: 18px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 800;
+  color: #065f46;
   margin: 0;
+  letter-spacing: -0.3px;
 }
 
 .count-tag {
   font-size: 12px;
-  background: #eff6ff;
-  color: #3b82f6;
+  background: #d1fae5;
+  color: #047857;
   padding: 2px 8px;
   border-radius: 12px;
   font-weight: 600;
@@ -621,8 +623,8 @@
 
 .med-selection-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08);
-  border-color: #3b82f6;
+  box-shadow: 0 20px 40px rgba(5, 150, 105, 0.12);
+  border-color: #059669;
 }
 
 .med-selection-card.dummy {
@@ -659,7 +661,7 @@
 }
 
 .med-card-price {
-  color: #3b82f6;
+  color: #059669;
   font-weight: 800;
   font-size: 18px;
 }
@@ -710,7 +712,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #3b82f6;
+  background: #059669;
   color: white;
   display: flex;
   align-items: center;
@@ -744,7 +746,7 @@
 .basket-pane {
   background: white;
   border-radius: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #d1fae5;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -908,8 +910,16 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
+
+.customer-form .full-width { grid-column: 1 / -1; }
+.send-bill-row { margin-top: 4px; }
+.checkbox-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: #475569; cursor: pointer;
+}
+.checkbox-label input { accent-color: #059669; width: 18px; height: 18px; }
 
 .input-with-icon {
   position: relative;
@@ -968,14 +978,14 @@
 }
 
 .payment-chips button.active {
-  background: #eff6ff;
-  border-color: #3b82f6;
-  color: #2563eb;
+  background: #d1fae5;
+  border-color: #059669;
+  color: #047857;
 }
 
 .basket-footer-premium {
   padding: 24px;
-  background: #0f172a;
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%);
   color: white;
 }
 
@@ -994,7 +1004,7 @@
 .checkout-btn {
   width: 100%;
   padding: 16px;
-  background: #3b82f6;
+  background: #059669;
   color: white;
   border: none;
   border-radius: 12px;
@@ -1008,7 +1018,7 @@
   transition: all 0.2s;
 }
 
-.checkout-btn:hover:not(:disabled) { background: #2563eb; transform: scale(1.02); }
+.checkout-btn:hover:not(:disabled) { background: #047857; transform: scale(1.02); }
 .checkout-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-icon { width: 20px; height: 20px; }
 
@@ -1043,3 +1053,43 @@
   border-color: #fecaca;
   transform: scale(1.05);
 }
+
+/* BILL MODAL - Professional pharmacy receipt */
+.bill-modal { max-width: 440px; }
+.bill-modal-header {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 16px 16px 0 0;
+}
+.bill-header-brand { display: flex; align-items: center; gap: 16px; }
+.pharma-icon { font-size: 40px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+.bill-header-brand h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+.bill-header-brand p { margin: 2px 0 0; font-size: 12px; opacity: 0.9; }
+.bill-modal-body { padding: 24px; }
+.bill-meta { display: flex; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed #e2e8f0; }
+.bill-number { font-weight: 700; color: #059669; font-size: 15px; }
+.bill-date { font-size: 13px; color: #64748b; }
+.bill-customer { margin-bottom: 16px; display: flex; flex-direction: column; gap: 2px; }
+.bill-customer strong { font-size: 15px; color: #0f172a; }
+.bill-email { font-size: 12px; color: #64748b; }
+.bill-items { margin-bottom: 16px; }
+.bill-item-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 8px 0; font-size: 14px; }
+.bill-item-row.header { font-weight: 700; color: #64748b; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+.bill-item-row span:last-child { text-align: right; font-weight: 600; }
+.bill-total-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;
+  font-size: 16px; font-weight: 700; color: #0f172a;
+}
+.bill-total-row strong { color: #059669; font-size: 20px; }
+.bill-qr-section {
+  margin-top: 20px; padding-top: 20px; border-top: 1px dashed #e2e8f0;
+  text-align: center;
+}
+.qr-label { font-size: 12px; font-weight: 600; color: #64748b; margin: 0 0 12px; }
+.bill-qr-img { width: 180px; height: 180px; border-radius: 12px; border: 2px solid #e2e8f0; padding: 8px; background: white; }
+.bill-modal-footer { padding: 20px 24px; border-top: 1px solid #e2e8f0; }

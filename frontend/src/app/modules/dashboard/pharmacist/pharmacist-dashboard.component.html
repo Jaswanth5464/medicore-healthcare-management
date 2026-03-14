@@ -101,7 +101,7 @@
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-              <input type="text" placeholder="Search by name or generic..." [(ngModel)]="counterSearch" (input)="updateFilteredInventory()">
+              <input type="text" placeholder="Search by name or generic..." [ngModel]="counterSearch()" (ngModelChange)="counterSearch.set($event); updateFilteredInventory()">
             </div>
           </div>
           <div class="med-selector-grid">
@@ -199,26 +199,39 @@
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                     <circle cx="12" cy="7" r="4"></circle>
                   </svg>
-                  <input type="text" placeholder="Full Name" [(ngModel)]="walkInCustomer().name">
+                  <input type="text" placeholder="Full Name" [ngModel]="walkInCustomer().name" (ngModelChange)="walkInCustomer.update(c => ({...c, name: $event}))">
                 </div>
                 <div class="input-with-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                   </svg>
-                  <input type="text" placeholder="Phone Number" [(ngModel)]="walkInCustomer().phone">
+                  <input type="text" placeholder="Phone Number" [ngModel]="walkInCustomer().phone" (ngModelChange)="walkInCustomer.update(c => ({...c, phone: $event}))">
+                </div>
+                <div class="input-with-icon full-width">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                  <input type="email" placeholder="Email (for bill receipt)" [ngModel]="walkInCustomer().email" (ngModelChange)="walkInCustomer.update(c => ({...c, email: $event}))">
+                </div>
+                <div class="send-bill-row">
+                  <label class="checkbox-label">
+                    <input type="checkbox" [checked]="walkInCustomer().sendBillToEmail" (change)="walkInCustomer.update(c => ({...c, sendBillToEmail: !c.sendBillToEmail}))">
+                    <span>Send bill to email</span>
+                  </label>
                 </div>
               </div>
               
               <div class="payment-method">
                 <label>Payment Method</label>
                 <div class="payment-chips">
-                  <button [class.active]="walkInCustomer().paymentMode === 'Cash'" (click)="walkInCustomer().paymentMode = 'Cash'">
+                  <button [class.active]="walkInCustomer().paymentMode === 'Cash'" (click)="walkInCustomer.update(c => ({...c, paymentMode: 'Cash'}))">
                     <span class="chip-icon">💵</span> Cash
                   </button>
-                  <button [class.active]="walkInCustomer().paymentMode === 'UPI'" (click)="walkInCustomer().paymentMode = 'UPI'">
+                  <button [class.active]="walkInCustomer().paymentMode === 'UPI'" (click)="walkInCustomer.update(c => ({...c, paymentMode: 'UPI'}))">
                     <span class="chip-icon">📱</span> UPI
                   </button>
-                  <button [class.active]="walkInCustomer().paymentMode === 'Card'" (click)="walkInCustomer().paymentMode = 'Card'">
+                  <button [class.active]="walkInCustomer().paymentMode === 'Card'" (click)="walkInCustomer.update(c => ({...c, paymentMode: 'Card'}))">
                     <span class="chip-icon">💳</span> Card
                   </button>
                 </div>
@@ -437,6 +450,57 @@
       <button class="action-btn success" *ngIf="selectedPrescription().isDispensed" disabled>
         ✓ Already Dispensed
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- BILL RECEIPT MODAL (after sale - with QR for UPI payment) -->
+<div class="modal-overlay bill-modal-overlay" *ngIf="showBillModal() && lastBill()">
+  <div class="modal bill-modal">
+    <div class="bill-modal-header">
+      <div class="bill-header-brand">
+        <span class="pharma-icon">💊</span>
+        <div>
+          <h2>MediCore Pharmacy</h2>
+          <p>Bill Receipt</p>
+        </div>
+      </div>
+      <button class="close-btn" (click)="closeBillModal()">✕</button>
+    </div>
+    <div class="bill-modal-body">
+      <div class="bill-meta">
+        <span class="bill-number">{{ lastBill()!.billNumber }}</span>
+        <span class="bill-date">{{ todayDate }}</span>
+      </div>
+      <div class="bill-customer" *ngIf="lastBill()!.customerName">
+        <strong>{{ lastBill()!.customerName }}</strong>
+        <span *ngIf="lastBill()!.customerEmail" class="bill-email">{{ lastBill()!.customerEmail }}</span>
+      </div>
+      <div class="bill-items">
+        <div class="bill-item-row header">
+          <span>Item</span>
+          <span>Qty</span>
+          <span>Price</span>
+          <span>Total</span>
+        </div>
+        <div class="bill-item-row" *ngFor="let item of lastBill()!.items">
+          <span>{{ item.name }}</span>
+          <span>{{ item.count }}</span>
+          <span>₹{{ item.price }}</span>
+          <span>₹{{ item.price * item.count }}</span>
+        </div>
+      </div>
+      <div class="bill-total-row">
+        <span>Total Payable</span>
+        <strong>₹{{ lastBill()!.total }}</strong>
+      </div>
+      <div class="bill-qr-section" *ngIf="qrDataUrl()">
+        <p class="qr-label">Scan to pay via UPI</p>
+        <img [src]="qrDataUrl()" alt="UPI QR Code" class="bill-qr-img">
+      </div>
+    </div>
+    <div class="bill-modal-footer">
+      <button class="action-btn primary" (click)="closeBillModal()">Done</button>
     </div>
   </div>
 </div>

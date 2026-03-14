@@ -302,18 +302,23 @@ export class SignalRService {
     }
     try {
       const token = this.authService.getAccessToken();
-      await fetch(`${this.configService.baseApiUrl}/api/chat/send`, {
+      const res = await fetch(`${this.configService.baseApiUrl}/api/chat/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ toUserId, message, imageUrl })
+        body: JSON.stringify({ toUserId, message: message ?? '', imageUrl: imageUrl ?? null })
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('HTTP chat/send failed', res.status, errText);
+        throw new Error(`Send failed: ${res.status}`);
+      }
       return true;
     } catch (e) {
       console.error('HTTP send also failed', e);
-      return false;
+      throw e;
     }
   }
 

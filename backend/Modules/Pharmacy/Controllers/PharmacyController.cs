@@ -1,5 +1,6 @@
 using MediCore.API.Modules.Pharmacy.Models;
 using MediCore.API.Modules.Finance.Models;
+using MediCore.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,13 +16,16 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
     {
         private readonly MediCoreDbContext _context;
         private readonly IHubContext<MediCore.API.Hubs.MediCoreHub> _hubContext;
+        private readonly IEmailService _emailService;
 
         public PharmacyController(
             MediCoreDbContext context,
-            IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext)
+            IHubContext<MediCore.API.Hubs.MediCoreHub> hubContext,
+            IEmailService emailService)
         {
             _context = context;
             _hubContext = hubContext;
+            _emailService = emailService;
         }
 
         // GET api/pharmacy/inventory
@@ -249,7 +253,33 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             _context.Bills.Add(bill);
             await _context.SaveChangesAsync();
 
-            return Ok(new { success = true, message = "Sale completed successfully", billNumber = bill.BillNumber, total = totalBill });
+            if (dto.SendBillToEmail && !string.IsNullOrWhiteSpace(dto.CustomerEmail))
+            {
+                try
+                {
+                    await _emailService.SendInvoiceAsync(
+                        dto.CustomerEmail.Trim(),
+                        dto.CustomerName ?? "Customer",
+                        bill.BillNumber,
+                        totalBill,
+                        DateTime.UtcNow.ToString("dd MMM yyyy HH:mm"),
+                        "Paid");
+                }
+                catch { /* Log but don't fail the sale */ }
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "Sale completed successfully",
+                billNumber = bill.BillNumber,
+                billId = bill.Id,
+                total = totalBill,
+                items = itemsSummary,
+                customerName = dto.CustomerName,
+                customerEmail = dto.CustomerEmail,
+                paymentMode = bill.PaymentMode
+            });
         }
 
         public class PrescribedMed 
@@ -262,8 +292,10 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
         {
             public string CustomerName { get; set; } = "Walk-in Customer";
             public string CustomerPhone { get; set; } = string.Empty;
+            public string? CustomerEmail { get; set; }
             public string? PaymentMode { get; set; }
             public int? PatientUserId { get; set; }
+            public bool SendBillToEmail { get; set; }
             public List<WalkInItemDto> Items { get; set; } = new();
         }
 

@@ -68,18 +68,32 @@ namespace MediCore.API.Hubs
         /// Note: the message payload is already AES-GCM encrypted by the client.
         /// The server acts only as a relay and never sees plaintext.
         /// </summary>
-        public async Task SendChatMessage(string toUserId, string encryptedMessage, string? imageUrl = null)
+        public async Task SendChatMessage(string? toUserId, string? encryptedMessage, string? imageUrl = null)
         {
+            if (string.IsNullOrWhiteSpace(toUserId))
+                throw new HubException("ToUserId is required.");
+            if (encryptedMessage == null)
+                throw new HubException("Message is required.");
+
             var fromUserId = Context.UserIdentifier ?? "Unknown";
-            Console.WriteLine($"SignalR: Relay message from {fromUserId} to {toUserId}");
-            
-            // Relay to recipient — they see: from=sender, to=recipient
-            await Clients.Group($"user-{toUserId}")
-                .SendAsync("ReceiveChatMessage", fromUserId, toUserId, encryptedMessage, imageUrl);
-            
-            // Echo to sender — they see: from=sender, to=recipient (same)
-            await Clients.Group($"user-{fromUserId}")
-                .SendAsync("ReceiveChatMessage", fromUserId, toUserId, encryptedMessage, imageUrl);
+            var message = encryptedMessage;
+            var imgUrl = imageUrl;
+
+            try
+            {
+                // Relay to recipient — they see: from=sender, to=recipient
+                await Clients.Group($"user-{toUserId}")
+                    .SendAsync("ReceiveChatMessage", fromUserId, toUserId, message, imgUrl);
+
+                // Echo to sender — they see: from=sender, to=recipient (same)
+                await Clients.Group($"user-{fromUserId}")
+                    .SendAsync("ReceiveChatMessage", fromUserId, toUserId, message, imgUrl);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MediCoreHub] SendChatMessage failed: {ex.Message}");
+                throw new HubException("Failed to send message. Please try again.");
+            }
         }
 
         public async Task SendGroupMessage(string groupName, string message)

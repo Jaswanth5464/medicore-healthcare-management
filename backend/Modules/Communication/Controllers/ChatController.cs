@@ -168,14 +168,14 @@ namespace MediCore.API.Modules.Communication.Controllers
             var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (userId == null) return Unauthorized();
 
-            // Patient access guard
+            // Patient access guard — allow same statuses as GetChatUsers (Confirmed, Scheduled, CheckedIn)
             if (User.IsInRole("Patient") && !string.IsNullOrEmpty(dto.ToUserId))
             {
                 if (!int.TryParse(userId, out var patientId)) return Unauthorized();
                 var allowed = await _context.Appointments
                     .Include(a => a.DoctorProfile)
                     .AnyAsync(a => a.PatientUserId == patientId
-                                && a.Status == "Confirmed"
+                                && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
                                 && a.DoctorProfile != null
                                 && a.DoctorProfile.UserId.ToString() == dto.ToUserId);
                 if (!allowed) return Forbid();
@@ -187,7 +187,7 @@ namespace MediCore.API.Modules.Communication.Controllers
                 FromUserId = userId,
                 ToUserId = dto.ToUserId ?? string.Empty,
                 GroupName = dto.GroupName,
-                Message = dto.Message,
+                Message = dto.Message ?? string.Empty,
                 ImageUrl = dto.ImageUrl,
                 SentAt = DateTime.UtcNow
             };

@@ -1,8 +1,8 @@
 <div class="dashboard-container">
   <div class="dashboard-header">
     <div class="header-left">
-      <h1>Laboratory Operations</h1>
-      <p>Manage test orders and upload diagnostic reports</p>
+      <h1>Laboratory & Diagnostics</h1>
+      <p>Manage test orders, upload reports, and track sample workflow</p>
     </div>
     
     <div class="header-stats">
@@ -38,9 +38,9 @@
   <div class="content-area">
     
     <!-- QUEUE TAB -->
-    <div *ngIf="activeTab() === 'queue'" class="tab-panel">
+    <div *ngIf="activeTab() === 'queue'" class="tab-panel lab-queue-panel">
       <div class="panel-header">
-        <h2>Active Diagnostics Queue</h2>
+        <h2>📋 Diagnostics Queue</h2>
         <button class="action-btn secondary" (click)="loadQueue()">Refresh Queue</button>
       </div>
       
@@ -97,9 +97,12 @@
     </div>
 
     <!-- REGISTRY TAB -->
-    <div *ngIf="activeTab() === 'tests'" class="tab-panel">
+    <div *ngIf="activeTab() === 'tests'" class="tab-panel lab-registry-panel">
       <div class="panel-header">
-        <h2>Available Lab Tests</h2>
+        <div>
+          <h2>🧪 Test Master Registry</h2>
+          <p class="panel-sub">Reference for all available diagnostic tests</p>
+        </div>
       </div>
       
       <div class="table-container mt-4">

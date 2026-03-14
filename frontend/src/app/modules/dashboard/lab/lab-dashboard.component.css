@@ -1,7 +1,7 @@
-/* Re-using pharmacist layout tokens for consistency but adapted for lab */
+/* Laboratory Module - Professional diagnostics UI */
 .dashboard-container {
   padding: 32px;
-  background-color: #f8fafc;
+  background: linear-gradient(180deg, #f5f3ff 0%, #faf5ff 30%, #f8fafc 100%);
   min-height: calc(100vh - 64px);
   animation: fadeIn 0.4s ease-out;
 }
@@ -20,8 +20,8 @@
 
 .header-left h1 {
   font-size: 28px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 800;
+  color: #5b21b6;
   margin: 0 0 8px 0;
   letter-spacing: -0.5px;
 }
@@ -125,10 +125,10 @@
 
 .tab-panel {
   background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  border: 1px solid #f1f5f9;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 10px 40px rgba(91, 33, 182, 0.06), 0 4px 12px rgba(0,0,0,0.04);
+  border: 1px solid #ede9fe;
 }
 
 .panel-header {
@@ -140,9 +140,15 @@
 
 .panel-header h2 {
   font-size: 20px;
-  font-weight: 600;
-  color: #1e293b;
+  font-weight: 700;
+  color: #5b21b6;
   margin: 0;
+}
+
+.panel-sub {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0 0;
 }
 
 .action-btn {
@@ -200,9 +206,9 @@
 }
 
 .data-table th {
-  padding: 16px;
-  background: #f8fafc;
-  color: #64748b;
+  padding: 18px;
+  background: linear-gradient(180deg, #f5f3ff 0%, #faf5ff 100%);
+  color: #6d28d9;
   font-weight: 600;
   font-size: 13px;
   text-transform: uppercase;
@@ -285,9 +291,9 @@
 
 .modal {
   background: white;
-  border-radius: 16px;
+  border-radius: 20px;
   width: 90%;
-  max-width: 500px;
+  max-width: 560px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -333,10 +339,10 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  background: #f8fafc;
-  padding: 16px;
-  border-radius: 8px;
-  border: 1px solid #f1f5f9;
+  background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #ede9fe;
 }
 
 .rx-info {

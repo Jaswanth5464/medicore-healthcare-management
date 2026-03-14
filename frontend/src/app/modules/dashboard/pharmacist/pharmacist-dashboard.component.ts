@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
+declare var QRCode: { toDataURL: (text: string, opts?: { width?: number; margin?: number }) => Promise<string> };
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -50,8 +51,11 @@ export class PharmacistDashboardComponent implements OnInit {
 
   // Walk-in Counter State
   walkInBasket = signal<any[]>([]);
-  walkInCustomer = signal({ name: '', phone: '', paymentMode: 'Cash' });
+  walkInCustomer = signal({ name: '', phone: '', email: '', paymentMode: 'Cash', sendBillToEmail: false });
   counterSearch = signal('');
+  lastBill = signal<{ billNumber: string; total: number; items: any[]; customerName: string; customerEmail?: string; paymentMode: string } | null>(null);
+  showBillModal = signal(false);
+  qrDataUrl = signal<string>('');
 
   filteredInventory = signal<any[]>([]);
 
@@ -257,34 +261,68 @@ export class PharmacistDashboardComponent implements OnInit {
     return this.walkInBasket().reduce((sum, item) => sum + (item.price * item.quantity), 0);
   }
 
+  get todayDate() {
+    return new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
   completeWalkInSale() {
     if (this.walkInBasket().length === 0) {
       this.ns.error('Basket is empty');
       return;
     }
-    
+
+    const cust = this.walkInCustomer();
     const payload = {
-      customerName: this.walkInCustomer().name || 'Walk-in Customer',
-      customerPhone: this.walkInCustomer().phone,
-      paymentMode: this.walkInCustomer().paymentMode,
+      customerName: cust.name || 'Walk-in Customer',
+      customerPhone: cust.phone,
+      customerEmail: cust.sendBillToEmail ? cust.email : undefined,
+      sendBillToEmail: cust.sendBillToEmail && !!cust.email,
+      paymentMode: cust.paymentMode,
       items: this.walkInBasket().map(i => ({ medicineId: i.id, count: i.quantity }))
     };
 
     this.isLoading.set(true);
-    this.http.post<{success: boolean, billNumber: string}>(`${this.BASE_URL}/api/pharmacy/walk-in`, payload)
-      .subscribe({
-        next: (res) => {
-          this.ns.success(`Sale completed! Bill: ${res.billNumber}`);
-          this.walkInBasket.set([]);
-          this.walkInCustomer.set({ name: '', phone: '', paymentMode: 'Cash' });
-          this.loadInventory();
-          this.isLoading.set(false);
-        },
-        error: (err) => {
-          this.ns.error(err.error?.message || 'Failed to complete sale');
-          this.isLoading.set(false);
-        }
-      });
+    this.http.post<any>(`${this.BASE_URL}/api/pharmacy/walk-in`, payload).subscribe({
+      next: (res) => {
+        this.ns.success(`Sale completed! Bill: ${res.billNumber}`);
+        this.lastBill.set({
+          billNumber: res.billNumber,
+          total: res.total,
+          items: res.items || [],
+          customerName: res.customerName || cust.name,
+          customerEmail: res.customerEmail,
+          paymentMode: res.paymentMode || 'Cash'
+        });
+        this.generateBillQr(res.billNumber, res.total);
+        this.walkInBasket.set([]);
+        this.walkInCustomer.update(c => ({ ...c, name: '', phone: '', email: '', sendBillToEmail: false }));
+        this.loadInventory();
+        this.isLoading.set(false);
+        this.showBillModal.set(true);
+      },
+      error: (err) => {
+        this.ns.error(err.error?.message || 'Failed to complete sale');
+        this.isLoading.set(false);
+      }
+    });
+  }
+
+  generateBillQr(billNumber: string, total: number) {
+    const upiId = 'medicorepharmacy@upi';
+    const payStr = `upi://pay?pa=${upiId}&pn=MediCore Pharmacy&am=${total}&tn=Bill ${billNumber}&cu=INR`;
+    if (typeof QRCode !== 'undefined') {
+      QRCode.toDataURL(payStr, { width: 200, margin: 2 })
+        .then((url: string) => this.qrDataUrl.set(url))
+        .catch(() => this.qrDataUrl.set(''));
+    } else {
+      this.qrDataUrl.set('');
+    }
+  }
+
+  closeBillModal() {
+    this.showBillModal.set(false);
+    this.lastBill.set(null);
+    this.qrDataUrl.set('');
   }
 
   isLowStock(med: any): boolean {

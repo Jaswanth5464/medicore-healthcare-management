@@ -10,6 +10,7 @@ using MediCore.API.Services;
 
 using MediCore.API.Infrastructure.Filters;
 using MediCore.API.Hubs;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 

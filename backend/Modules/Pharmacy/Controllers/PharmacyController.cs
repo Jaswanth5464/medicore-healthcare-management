@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
+using MediCore.API.Infrastructure.Database.Context;
 
 namespace MediCore.API.Modules.Pharmacy.Controllers
 {

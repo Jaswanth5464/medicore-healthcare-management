@@ -250,6 +250,11 @@ namespace MediCore.API.Modules.OPD.Controllers
             if (appointment == null)
                 return NotFound(new { success = false, message = "Appointment not found" });
 
+            if (dto.Status == "CheckedIn" && appointment.PaymentStatus != "Paid")
+            {
+                return BadRequest(new { success = false, message = "Consultation fee must be paid before check-in." });
+            }
+
             var now = DateTime.UtcNow;
             var prevStatus = appointment.Status;
             appointment.Status = dto.Status;
@@ -314,7 +319,9 @@ namespace MediCore.API.Modules.OPD.Controllers
                     AppointmentId = appointment.Id,
                     PatientUserId = appointment.PatientUserId,
                     DoctorProfileId = appointment.DoctorProfileId,
-                    Items = System.Text.Json.JsonSerializer.Serialize(items),
+                    BillSource = "OPD",
+                    SourceReferenceId = appointment.Id,
+                    Items = System.Text.Json.Serializer.Serialize(items),
                     SubTotal = total,
                     TotalAmount = total,
                     Status = "Unpaid",

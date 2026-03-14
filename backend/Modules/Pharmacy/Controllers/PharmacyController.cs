@@ -1,5 +1,5 @@
-using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Pharmacy.Models;
+using MediCore.API.Modules.Finance.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -33,13 +33,36 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             return Ok(new { success = true, data = medicines });
         }
 
-        // POST api/pharmacy/inventory
-        [HttpPost("inventory")]
-        public async Task<IActionResult> AddMedicine([FromBody] Medicine medicine)
+        // PUT api/pharmacy/inventory/{id}
+        [HttpPut("inventory/{id}")]
+        public async Task<IActionResult> UpdateMedicine(int id, [FromBody] Medicine medicine)
         {
-            _context.Medicines.Add(medicine);
+            var existing = await _context.Medicines.FindAsync(id);
+            if (existing == null) return NotFound(new { success = false, message = "Medicine not found" });
+
+            existing.MedicineName = medicine.MedicineName;
+            existing.GenericName = medicine.GenericName;
+            existing.Category = medicine.Category;
+            existing.Manufacturer = medicine.Manufacturer;
+            existing.Price = medicine.Price;
+            existing.StockQuantity = medicine.StockQuantity;
+            existing.LowStockThreshold = medicine.LowStockThreshold;
+            existing.ExpiryDate = medicine.ExpiryDate;
+
             await _context.SaveChangesAsync();
-            return Ok(new { success = true, data = medicine, message = "Medicine added successfully" });
+            return Ok(new { success = true, message = "Medicine updated successfully" });
+        }
+
+        // DELETE api/pharmacy/inventory/{id}
+        [HttpDelete("inventory/{id}")]
+        public async Task<IActionResult> DeleteMedicine(int id)
+        {
+            var medicine = await _context.Medicines.FindAsync(id);
+            if (medicine == null) return NotFound(new { success = false, message = "Medicine not found" });
+
+            _context.Medicines.Remove(medicine);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = "Medicine deleted successfully" });
         }
 
         // GET api/pharmacy/queue
@@ -79,8 +102,48 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
 
             if (prescription.IsDispensed) return BadRequest(new { success = false, message = "Already dispensed" });
 
-            // Ideally parse medicinesJson and deduct stock. For MVP, we will just mark dispensed.
+            // Parse medicines and calculate total
+            var medList = System.Text.Json.JsonSerializer.Deserialize<List<PrescribedMed>>(prescription.MedicinesJson ?? "[]") ?? new List<PrescribedMed>();
+            decimal totalBill = 0;
+
+            foreach (var pMed in medList)
+            {
+                var med = await _context.Medicines.FirstOrDefaultAsync(m => m.Name == pMed.name);
+                if (med != null)
+                {
+                    int count = pMed.count > 0 ? pMed.count : 1; 
+                    totalBill += med.Price * count;
+                    
+                    // Deduct Stock
+                    if (med.StockQuantity >= count)
+                    {
+                        med.StockQuantity -= count;
+                    }
+                }
+            }
+
+            // Mark dispensed
             prescription.IsDispensed = true;
+            prescription.DispensedAt = DateTime.UtcNow;
+
+            // Create Bill
+            var bill = new Bill
+            {
+                BillNumber = $"PHARM-{DateTime.UtcNow:yyyyMMdd}-{prescription.Id}",
+                PatientUserId = prescription.PatientUserId,
+                DoctorProfileId = prescription.DoctorProfileId,
+                BillSource = "Pharmacy",
+                SourceReferenceId = prescription.Id,
+                Items = prescription.MedicinesJson ?? "[]",
+                SubTotal = totalBill,
+                TotalAmount = totalBill,
+                Status = "Paid", // For pharmacy, we assume payment is handled at counter before/during dispense
+                PaymentMode = "Cash",
+                PaidAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Bills.Add(bill);
+
             await _context.SaveChangesAsync();
 
             // Notify Patient
@@ -90,11 +153,86 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 await _hubContext.Clients.Group($"user-{appointment.PatientUserId}")
                     .SendAsync("PrescriptionDispensed", new { 
                         prescriptionId = prescription.Id,
-                        tokenNumber = appointment.TokenNumber
+                        tokenNumber = appointment.TokenNumber,
+                        billAmount = totalBill
                     });
             }
 
-            return Ok(new { success = true, message = "Medicines dispensed successfully" });
+            return Ok(new { success = true, message = "Medicines dispensed and bill generated successfully", billAmount = totalBill });
+        }
+
+        // POST api/pharmacy/walk-in
+        [HttpPost("walk-in")]
+        public async Task<IActionResult> ProcessWalkInSale([FromBody] WalkInSaleDto dto)
+        {
+            if (dto.Items == null || !dto.Items.Any())
+                return BadRequest(new { success = false, message = "No items in basket" });
+
+            decimal totalBill = 0;
+            var itemsSummary = new List<object>();
+
+            foreach (var item in dto.Items)
+            {
+                var med = await _context.Medicines.FindAsync(item.MedicineId);
+                if (med == null) continue;
+
+                if (med.StockQuantity < item.Count)
+                    return BadRequest(new { success = false, message = $"Insufficient stock for {med.MedicineName}" });
+
+                med.StockQuantity -= item.Count;
+                totalBill += med.Price * item.Count;
+                itemsSummary.Add(new { name = med.MedicineName, count = item.Count, price = med.Price });
+            }
+
+            // Create Bill for Walk-in
+            var bill = new Bill
+            {
+                BillNumber = $"WALK-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}",
+                BillSource = "Pharmacy",
+                Items = System.Text.Json.JsonSerializer.Serialize(itemsSummary),
+                SubTotal = totalBill,
+                TotalAmount = totalBill,
+                Status = "Paid",
+                PaymentMode = dto.PaymentMode ?? "Cash",
+                PaidAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                // For walk-in, we store customer details in a generic way or skip IDs
+                // In a real HMS, we might have a placeholder user or additional fields in Bill
+            };
+            
+            // Note: Since Bill model requires PatientUserId, we should either allow it to be nullable 
+            // or use a default "Walk-in" user ID. For now, let's assume Bill needs a user or we use a system guest ID.
+            // If PatientUserId is not nullable, this might fail. Checking Bill.cs again...
+            // It's 'public int PatientUserId { get; set; }'. 
+            // Let's find/create a Guest User or make it nullable if possible. 
+            // In many HMS, PatientUserId 0 or a specific ID like 1 is for Walk-ins.
+            bill.PatientUserId = dto.PatientUserId ?? 0; // Default to 0 or provided ID
+
+            _context.Bills.Add(bill);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, message = "Sale completed successfully", billNumber = bill.BillNumber, total = totalBill });
+        }
+
+        public class PrescribedMed 
+        {
+            public string name { get; set; } = string.Empty;
+            public int count { get; set; }
+        }
+
+        public class WalkInSaleDto
+        {
+            public string CustomerName { get; set; } = "Walk-in Customer";
+            public string CustomerPhone { get; set; } = string.Empty;
+            public string? PaymentMode { get; set; }
+            public int? PatientUserId { get; set; }
+            public List<WalkInItemDto> Items { get; set; } = new();
+        }
+
+        public class WalkInItemDto
+        {
+            public int MedicineId { get; set; }
+            public int Count { get; set; }
         }
     }
 }

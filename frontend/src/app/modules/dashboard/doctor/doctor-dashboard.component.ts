@@ -175,18 +175,55 @@ import { PatientDoctorChatComponent } from '../../communication/chat/patient-doc
                 <div class="panel-body">
                   <div class="input-group full" style="margin-top:10px;"><label>Diagnosis</label><input [(ngModel)]="prescription.diagnosis" placeholder="Primary diagnosis"></div>
                   
-                  <div class="medication-checklist" style="margin-top:20px;">
-                    <label style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:12px; display:block;">Quick Medicine Select</label>
-                    <div class="med-grid">
-                      <label *ngFor="let med of checkboxMeds()" class="med-item">
-                        <input type="checkbox" (change)="toggleMed(med.name)" [checked]="isMedSelected(med.name)">
-                        <span>{{ med.name }} <small>({{ med.dose }})</small></span>
-                      </label>
+                  <div class="medication-search" style="margin-top:20px;">
+                    <label style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:8px; display:block;">Search & Add Medicines</label>
+                    <div class="search-box" style="position:relative;">
+                      <input [(ngModel)]="medSearchTerm" (input)="medSearchTerm.set($any($event.target).value)" placeholder="Search by name or generic (e.g. Paracetamol, GSK...)" style="padding:10px 14px;">
+                      <div class="search-results" *ngIf="filteredMeds().length > 0" style="position:absolute; top:42px; left:0; right:0; background:#fff; border:1px solid #cbd5e1; border-radius:8px; z-index:100; box-shadow:0 10px 25px rgba(0,0,0,0.1); max-height:250px; overflow:auto;">
+                        <div *ngFor="let m of filteredMeds()" (click)="addMed(m)" class="search-item" style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between;">
+                          <div>
+                            <div style="font-weight:600; font-size:14px;">{{ m.name }}</div>
+                            <small style="color:#64748b;">{{ m.genericName }} • {{ m.manufacturer }}</small>
+                          </div>
+                          <div style="text-align:right;">
+                            <div style="color:#16a34a; font-weight:700;">₹{{ m.price }}</div>
+                            <small [style.color]="m.stockQuantity < 50 ? 'red' : '#64748b'">Stock: {{ m.stockQuantity }}</small>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div class="input-group full" style="margin-top:20px;"><label>Full Prescription / Medicines</label>
-                    <textarea [(ngModel)]="prescription.medicinesJson" rows="4" placeholder="1. Paracetamol 500mg, 1-0-1..."></textarea>
+                  <div class="prescribed-list" *ngIf="prescribedMeds().length > 0" style="margin-top:20px;">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Medicine</th>
+                          <th>Dosage (Morning-Noon-Night)</th>
+                          <th>Duration</th>
+                          <th>Count/Qty</th>
+                          <th>Notes</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let m of prescribedMeds(); let i = index">
+                          <td>
+                            <div style="font-weight:600;">{{ m.name }}</div>
+                            <small>{{ m.genericName }}</small>
+                          </td>
+                          <td><input [(ngModel)]="m.dosage" style="width:100px;"></td>
+                          <td><input [(ngModel)]="m.duration" style="width:80px;"></td>
+                          <td><input type="number" [(ngModel)]="m.count" style="width:60px;"></td>
+                          <td><input [(ngModel)]="m.instructions" placeholder="e.g. After Food"></td>
+                          <td><button class="small-btn danger" (click)="removeMed(i)">×</button></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="input-group full" style="margin-top:20px; display:none;"><label>Full Prescription / Medicines</label>
+                    <textarea [(ngModel)]="prescription.medicinesJson" rows="4"></textarea>
                   </div>
 
                   <div class="form-grid" style="margin-top:20px;">
@@ -331,6 +368,17 @@ import { PatientDoctorChatComponent } from '../../communication/chat/patient-doc
     .med-item:hover { background:#f1f5f9; }
     .med-item input { width:auto; }
     .med-item small { color:#64748b; }
+
+    /* MEDICINE SEARCH & TABLE */
+    .search-box input { border: 2px solid #e2e8f0; transition: border-color 0.2s; }
+    .search-box input:focus { border-color: #3b82f6; }
+    .search-item:hover { background: #f8fafc; }
+    .search-item div { line-height: 1.4; }
+    
+    .prescribed-list table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .prescribed-list th { background: #f8fafc; padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; }
+    .prescribed-list td { padding: 12px; border-top: 1px solid #f1f5f9; vertical-align: middle; }
+    .prescribed-list input { padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; }
   `]
 })
 export class DoctorDashboardComponent implements OnInit {
@@ -354,16 +402,20 @@ export class DoctorDashboardComponent implements OnInit {
 
   vitals = { bloodPressure: '', heartRateBpm: null, temperatureFahrenheit: null, weightKg: null, spO2: null };
   lab = { testType: 'Blood Test', notes: '' };
-  prescription: any = { diagnosis: '', medicinesJson: '', advice: '', dietPlan: '' };
+  prescription: any = { diagnosis: '', medicinesJson: '[]', advice: '', dietPlan: '' };
 
-  checkboxMeds = signal([
-    { name: 'Paracetamol', dose: '500mg' },
-    { name: 'Amoxicillin', dose: '250mg' },
-    { name: 'Cetirizine', dose: '10mg' },
-    { name: 'Pantoprazole', dose: '40mg' },
-    { name: 'Vitamin C', dose: '500mg' },
-    { name: 'Ibuprofen', dose: '400mg' }
-  ]);
+  // New Prescription State
+  inventory = signal<any[]>([]);
+  prescribedMeds = signal<any[]>([]);
+  medSearchTerm = signal('');
+  filteredMeds = computed(() => {
+    const term = this.medSearchTerm().toLowerCase();
+    if (!term) return [];
+    return this.inventory().filter(m => 
+      m.name.toLowerCase().includes(term) || 
+      m.genericName.toLowerCase().includes(term)
+    ).slice(0, 10);
+  });
 
   // Statuses
   vitalsSaved = signal(false);
@@ -380,6 +432,7 @@ export class DoctorDashboardComponent implements OnInit {
   ngOnInit() {
     this.loadProfile();
     this.loadLeaves();
+    this.loadInventory();
   }
 
   getHeaders() {
@@ -407,6 +460,12 @@ export class DoctorDashboardComponent implements OnInit {
     });
   }
 
+  loadInventory() {
+    this.http.get<any>(`${this.BASE_URL}/api/pharmacy/inventory`, { headers: this.getHeaders() }).subscribe(res => {
+      if (res.success) this.inventory.set(res.data);
+    });
+  }
+
   startConsultation(event: { appointmentId: number, patientName: string, patientUserId?: string }) {
     this.activeAppointmentId.set(event.appointmentId);
     this.consultationPatientName.set(event.patientName);
@@ -415,7 +474,8 @@ export class DoctorDashboardComponent implements OnInit {
     // Reset forms
     this.vitals = { bloodPressure: '', heartRateBpm: null, temperatureFahrenheit: null, weightKg: null, spO2: null };
     this.lab = { testType: 'Blood Test', notes: '' };
-    this.prescription = { diagnosis: '', medicinesJson: '', advice: '' };
+    this.prescription = { diagnosis: '', medicinesJson: '[]', advice: '', dietPlan: '' };
+    this.prescribedMeds.set([]);
     this.vitalsSaved.set(false);
     this.prescSaved.set(false);
     this.savedLabs.set([]);
@@ -430,6 +490,9 @@ export class DoctorDashboardComponent implements OnInit {
           }
           if (res.data.prescriptions?.length > 0) {
             this.prescription = res.data.prescriptions[0];
+            try {
+              this.prescribedMeds.set(JSON.parse(this.prescription.medicinesJson || '[]'));
+            } catch(e) { this.prescribedMeds.set([]); }
             this.prescSaved.set(true);
           }
           if (res.data.labOrders?.length > 0) {
@@ -464,9 +527,28 @@ export class DoctorDashboardComponent implements OnInit {
 
   savePrescription() {
     if (!this.prescription.diagnosis) { this.notify.error('Diagnosis is required'); return; }
+    // Serialize meds to JSON
+    this.prescription.medicinesJson = JSON.stringify(this.prescribedMeds());
     const payload = { appointmentId: this.activeAppointmentId(), ...this.prescription };
     this.http.post<any>(`${this.BASE_URL}/api/consultation/prescription`, payload, { headers: this.getHeaders() })
       .subscribe(res => { if (res.success) this.prescSaved.set(true); });
+  }
+
+  addMed(med: any) {
+    if (this.prescribedMeds().some(m => m.name === med.name)) return;
+    this.prescribedMeds.update(list => [...list, { 
+      name: med.name, 
+      genericName: med.genericName,
+      dosage: '1-0-1', 
+      duration: '5 days',
+      count: 10,
+      instructions: 'After Food' 
+    }]);
+    this.medSearchTerm.set('');
+  }
+
+  removeMed(index: number) {
+    this.prescribedMeds.update(list => list.filter((_, i) => i !== index));
   }
 
   printPrescription() {
@@ -505,7 +587,26 @@ export class DoctorDashboardComponent implements OnInit {
 
         <div style="margin-bottom: 30px;">
           <h3 style="border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">℞ Medicines</h3>
-          <pre style="font-family: inherit; white-space: pre-wrap; margin-top: 10px;">${rx.medicinesJson}</pre>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+              <tr style="text-align: left; background: #f8fafc;">
+                <th style="padding: 8px; border-bottom: 1px solid #e2e8f0;">Medicine</th>
+                <th style="padding: 8px; border-bottom: 1px solid #e2e8f0;">Dosage</th>
+                <th style="padding: 8px; border-bottom: 1px solid #e2e8f0;">Duration</th>
+                <th style="padding: 8px; border-bottom: 1px solid #e2e8f0;">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${this.prescribedMeds().map(m => `
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>${m.name}</strong><br><small>${m.genericName}</small></td>
+                  <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${m.dosage}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${m.duration}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${m.count}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
 
         <div style="margin-bottom: 30px;">
@@ -600,16 +701,7 @@ export class DoctorDashboardComponent implements OnInit {
       });
   }
 
-  toggleMed(name: string) {
-    let current = this.prescription.medicinesJson || '';
-    if (this.isMedSelected(name)) {
-      this.prescription.medicinesJson = current.replace(`${name} | 1-0-1 | After Food\n`, '').replace(`${name} | 1-0-1 | After Food`, '').trim();
-    } else {
-      this.prescription.medicinesJson = current + (current ? '\n' : '') + `${name} | 1-0-1 | After Food`;
-    }
-  }
-
   isMedSelected(name: string): boolean {
-    return (this.prescription.medicinesJson || '').includes(name);
+    return this.prescribedMeds().some(m => m.name === name);
   }
 }

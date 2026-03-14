@@ -34,10 +34,14 @@ export class LabDashboardComponent implements OnInit {
 
   // Upload Form
   uploadData = {
-    reportPdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', // Mock PDF URL for MVP
+    reportPdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 
     resultNotes: '',
-    isCritical: false
+    isCritical: false,
+    resultsJson: '[]'
   };
+
+  // Structured Results
+  labResults = signal<any[]>([]);
 
   ngOnInit() {
     this.loadQueue();
@@ -76,8 +80,32 @@ export class LabDashboardComponent implements OnInit {
     this.uploadData = {
       reportPdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
       resultNotes: '',
-      isCritical: false
+      isCritical: false,
+      resultsJson: '[]'
     };
+    // Initialize structured results if applicable
+    this.labResults.set([
+      { parameter: 'Result Value', value: '', unit: '', normalRange: '' }
+    ]);
+  }
+
+  updateOrderStatus(orderId: number, status: string) {
+    this.http.patch<any>(`${this.BASE_URL}/api/lab/orders/${orderId}/status`, { status }, { 
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+    }).subscribe(res => {
+      if (res.success) {
+        this.ns.success(`Status updated to ${status}`);
+        this.loadQueue();
+      }
+    });
+  }
+
+  addResultRow() {
+    this.labResults.update(r => [...r, { parameter: '', value: '', unit: '', normalRange: '' }]);
+  }
+
+  removeResultRow(index: number) {
+    this.labResults.update(r => r.filter((_, i) => i !== index));
   }
 
   closeUploadModal() {
@@ -87,6 +115,7 @@ export class LabDashboardComponent implements OnInit {
   submitReport() {
     if (!this.selectedOrder()) return;
     
+    this.uploadData.resultsJson = JSON.stringify(this.labResults());
     this.isUploading.set(true);
     this.http.post<{success: boolean, message: string}>(`${this.BASE_URL}/api/lab/upload-report/${this.selectedOrder().id}`, this.uploadData)
       .subscribe({

@@ -30,6 +30,9 @@
     <button class="tab-btn" [class.active]="activeTab() === 'inventory'" (click)="activeTab.set('inventory')">
       Inventory Management
     </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'counter'" (click)="activeTab.set('counter')">
+      Offline Counter
+    </button>
     <button class="tab-btn" [class.active]="activeTab() === 'chat'" (click)="activeTab.set('chat')">
       Staff Chat
     </button>
@@ -83,6 +86,89 @@
       </div>
     </div>
 
+    <!-- OFFLINE COUNTER TAB -->
+    <div *ngIf="activeTab() === 'counter'" class="tab-panel counter-panel">
+      <div class="counter-grid">
+        <!-- Medicine Selection -->
+        <div class="inventory-selector">
+          <div class="panel-header search-header">
+            <h3>Select Medicines</h3>
+            <div class="search-box">
+              <input type="text" placeholder="Search medicine..." [(ngModel)]="counterSearch" (input)="updateFilteredInventory()">
+            </div>
+          </div>
+          <div class="med-selector-grid">
+            <div class="med-selection-card" *ngFor="let med of filteredInventory()" (click)="addToBasket(med)">
+              <div class="msc-top">
+                <span class="msc-name">{{ med.medicineName }}</span>
+                <span class="msc-price">₹{{ med.price }}</span>
+              </div>
+              <div class="msc-bottom">
+                <span class="msc-stock" [class.low]="med.stockQuantity < 5">Stock: {{ med.stockQuantity }}</span>
+                <span class="msc-category">{{ med.category }}</span>
+              </div>
+              <button class="add-btn">+</button>
+            </div>
+            <div *ngIf="filteredInventory().length === 0" class="empty-state">No medicines match your search.</div>
+          </div>
+        </div>
+
+        <!-- Basket / Checkout -->
+        <div class="basket-pane">
+          <div class="panel-header">
+            <h3>Sales Basket</h3>
+            <button class="action-btn text-red small" (click)="walkInBasket.set([])" *ngIf="walkInBasket().length > 0">Clear</button>
+          </div>
+
+          <div class="basket-items">
+            <div class="basket-item" *ngFor="let item of walkInBasket(); let i = index">
+              <div class="bi-info">
+                <span class="bi-name">{{ item.medicineName }}</span>
+                <span class="bi-sub">₹{{ item.price }} / unit</span>
+              </div>
+              <div class="bi-controls">
+                <button (click)="updateItemQuantity(i, -1)">-</button>
+                <span class="bi-qty">{{ item.quantity }}</span>
+                <button [disabled]="item.quantity >= item.stockQuantity" (click)="updateItemQuantity(i, 1)">+</button>
+              </div>
+              <div class="bi-total">₹{{ item.price * item.quantity }}</div>
+              <button class="bi-remove" (click)="removeFromBasket(i)">✕</button>
+            </div>
+            <div *ngIf="walkInBasket().length === 0" class="empty-basket">
+              <div class="icon">🛒</div>
+              <p>Basket is empty. Select medicines from the left to start a walk-in sale.</p>
+            </div>
+          </div>
+
+          <div class="customer-info" *ngIf="walkInBasket().length > 0">
+            <h4>Customer Details</h4>
+            <div class="form-grid-2">
+              <input type="text" placeholder="Customer Name" [(ngModel)]="walkInCustomer().name">
+              <input type="text" placeholder="Phone Number" [(ngModel)]="walkInCustomer().phone">
+            </div>
+            <div class="payment-selection">
+              <label>Payment Mode:</label>
+              <div class="pay-chips">
+                <button [class.active]="walkInCustomer().paymentMode === 'Cash'" (click)="walkInCustomer().paymentMode = 'Cash'">Cash</button>
+                <button [class.active]="walkInCustomer().paymentMode === 'UPI'" (click)="walkInCustomer().paymentMode = 'UPI'">UPI</button>
+                <button [class.active]="walkInCustomer().paymentMode === 'Card'" (click)="walkInCustomer().paymentMode = 'Card'">Card</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="basket-footer" *ngIf="walkInBasket().length > 0">
+            <div class="grand-total">
+              <span>Grand Total</span>
+              <strong>₹{{ basketTotal }}</strong>
+            </div>
+            <button class="complete-btn" [disabled]="isLoading()" (click)="completeWalkInSale()">
+              {{ isLoading() ? 'Processing...' : 'Complete Sale & Generate Bill' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- INVENTORY TAB -->
     <div *ngIf="activeTab() === 'inventory'" class="tab-panel">
       <div class="panel-header flex-between">
@@ -90,9 +176,9 @@
         <button class="action-btn primary" (click)="toggleAddMedicine()">+ Add New Medicine</button>
       </div>
       
-      <!-- ADD MEDICINE FORM -->
+      <!-- ADD/EDIT MEDICINE FORM -->
       <div class="form-card" *ngIf="showAddMedicine()">
-        <h3>Add Stock Entry</h3>
+        <h3>{{ isEditingMedicine() ? 'Edit Medicine' : 'Add Stock Entry' }}</h3>
         <div class="form-grid">
           <div class="form-group">
             <label>Medicine Name *</label>
@@ -123,7 +209,7 @@
             <input type="number" [(ngModel)]="newMedicine.price" min="0">
           </div>
           <div class="form-group">
-            <label>Add Stock Quantity</label>
+            <label>{{ isEditingMedicine() ? 'Update Stock' : 'Add Stock Quantity' }}</label>
             <input type="number" [(ngModel)]="newMedicine.stockQuantity" min="0">
           </div>
           <div class="form-group">
@@ -136,8 +222,8 @@
           </div>
         </div>
         <div class="form-actions">
-          <button class="action-btn secondary" (click)="toggleAddMedicine()">Cancel</button>
-          <button class="action-btn primary" (click)="addMedicine()">Save to Inventory</button>
+          <button class="action-btn secondary" (click)="finishMedicineForm()">Cancel</button>
+          <button class="action-btn primary" (click)="addMedicine()">{{ isEditingMedicine() ? 'Update Medicine' : 'Save to Inventory' }}</button>
         </div>
       </div>
 
@@ -151,11 +237,12 @@
               <th>Stock</th>
               <th>Price</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngIf="inventoryData().length === 0">
-              <td colspan="6" class="empty-state">No medicines found in inventory.</td>
+              <td colspan="7" class="empty-state">No medicines found in inventory.</td>
             </tr>
             <tr *ngFor="let med of inventoryData()">
               <td>
@@ -174,6 +261,12 @@
                 <span class="badge" [class.danger]="isLowStock(med)" [class.success]="!isLowStock(med)">
                   {{ isLowStock(med) ? 'Low Stock' : 'In Stock' }}
                 </span>
+              </td>
+              <td>
+                <div class="action-btns">
+                  <button class="icon-btn edit" (click)="editMedicine(med)" title="Edit">✏️</button>
+                  <button class="icon-btn delete" (click)="deleteMedicine(med.id)" title="Delete">🗑️</button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -219,16 +312,28 @@
       </div>
 
       <div class="rx-medicines">
-        <h4>Prescribed Medicines</h4>
-        <div class="med-list">
-          <div class="med-item" *ngFor="let med of parseMedicines(selectedPrescription().medicinesJson)">
-            <div class="med-name">💊 {{ med.name }}</div>
-            <div class="med-dosage">{{ med.dosage }} - {{ med.duration }}</div>
-            <div class="med-instructions">{{ med.instructions }}</div>
+        <h4>Prescribed Medicines & Pricing</h4>
+        <div class="med-list premium-list">
+          <div class="med-item enterprise-item" *ngFor="let med of parseMedicines(selectedPrescription().medicinesJson)">
+            <div class="med-top">
+              <div class="med-name">💊 {{ med.name }}</div>
+              <div class="med-price">₹{{ med.price }} × {{ med.count || 1 }} = <strong>₹{{ (med.price * (med.count || 1)) }}</strong></div>
+            </div>
+            <div class="med-details">
+              <span class="detail-tag">{{ med.dosage }}</span>
+              <span class="detail-tag">{{ med.duration }}</span>
+              <span class="detail-tag">{{ med.instructions }}</span>
+              <span class="stock-tag" [class.low]="med.stock < (med.count || 1)">Stock: {{ med.stock }}</span>
+            </div>
           </div>
           <div *ngIf="parseMedicines(selectedPrescription().medicinesJson).length === 0" class="empty-meds">
-            No specific medicines listed in JSON format. Please refer to printed/PDF version.
+            No structured medicines found.
           </div>
+        </div>
+
+        <div class="rx-total" *ngIf="parseMedicines(selectedPrescription().medicinesJson).length > 0">
+          <div class="total-label">Estimated Total Bill</div>
+          <div class="total-amount">₹{{ calculateTotal(selectedPrescription().medicinesJson) }}</div>
         </div>
       </div>
       

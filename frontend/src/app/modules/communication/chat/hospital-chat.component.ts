@@ -44,9 +44,9 @@ const ROLE_COLOR: Record<string, string> = {
       <!-- Call Overlay -->
       <app-call-overlay
         *ngIf="showCall()"
-        [callerName]="selectedUser()?.fullName || 'Colleague'"
+        [callerName]="callPartnerName()"
         [callType]="callType()"
-        [callerId]="selectedUserId()!"
+        [callerId]="callPartnerId()!"
         [isInitiator]="callInitiator()"
         (callEnded)="showCall.set(false)">
       </app-call-overlay>
@@ -504,6 +504,8 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   showCall = signal(false);
   callType = signal<'video' | 'audio'>('video');
   callInitiator = signal(false);
+  callPartnerId = signal<string | null>(null);
+  callPartnerName = signal<string>('Colleague');
   private typingTimeout: any = null;
 
   /** Department-grouped users after search */
@@ -560,11 +562,13 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
     effect(() => { this.activeMessages(); this.scrollToBottom(); });
     // Listen for incoming calls
     this.signalR.onWebRtcEvent('IncomingCall', (from: string, type: string) => {
-      if (this.selectedUserId() && String(from) === String(this.selectedUserId())) {
-        this.callType.set(type as 'video' | 'audio');
-        this.callInitiator.set(false);
-        this.showCall.set(true);
-      }
+      // Find the user info from availableUsers
+      const caller = this.availableUsers().find(u => String(u.id) === String(from));
+      this.callPartnerId.set(String(from));
+      this.callPartnerName.set(caller?.fullName || 'Colleague');
+      this.callType.set(type as 'video' | 'audio');
+      this.callInitiator.set(false);
+      this.showCall.set(true);
     });
   }
 
@@ -589,6 +593,8 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
 
   startCall(type: 'video' | 'audio') {
     if (!this.selectedUserId()) return;
+    this.callPartnerId.set(this.selectedUserId());
+    this.callPartnerName.set(this.selectedUser()?.fullName || 'Colleague');
     this.callType.set(type);
     this.callInitiator.set(true);
     this.showCall.set(true);

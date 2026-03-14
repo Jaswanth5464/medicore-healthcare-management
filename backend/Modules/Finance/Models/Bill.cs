@@ -8,11 +8,14 @@ namespace MediCore.API.Modules.Finance.Models
         public string BillNumber { get; set; } = string.Empty;
 
         // Relationships
-        public int AppointmentId { get; set; }
+        public int? AppointmentId { get; set; }
         public int PatientUserId { get; set; }
-        public int DoctorProfileId { get; set; }
+        public int? DoctorProfileId { get; set; }
+
+        public string BillSource { get; set; } = "OPD"; // OPD, Pharmacy, Laboratory
+        public int? SourceReferenceId { get; set; } // AppointmentId, PrescriptionId, or LabOrderId
  
-        public Appointment Appointment { get; set; } = null!;
+        public Appointment? Appointment { get; set; }
 
         // Items - stored as JSON string
         public string Items { get; set; } = "[]";

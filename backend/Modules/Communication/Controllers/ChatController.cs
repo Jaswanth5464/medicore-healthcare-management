@@ -49,7 +49,7 @@ namespace MediCore.API.Modules.Communication.Controllers
                     .Include(a => a.DoctorProfile)
                         .ThenInclude(dp => dp.User)
                     .Where(a => a.PatientUserId == currentUserId
-                             && a.Status == "Confirmed"
+                             && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
                              && a.DoctorProfile != null
                              && a.DoctorProfile.User != null)
                     .Select(a => new

@@ -1,5 +1,5 @@
-using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Laboratory.Models;
+using MediCore.API.Modules.Finance.Models;
 using MediCore.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -64,10 +64,32 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             var order = await _context.LabOrders.FindAsync(id);
             if (order == null) return NotFound(new { success = false, message = "Order not found" });
 
+            // Calculate test price from master
+            var testMaster = await _context.LabTestMasters.FirstOrDefaultAsync(t => t.TestName == order.TestType);
+            decimal price = testMaster?.Price ?? 0;
+
             order.Status = "Completed";
             order.ResultNotes = dto.ResultNotes;
             order.ReportUrl = dto.ReportUrl;
             order.CompletedAt = DateTime.UtcNow;
+
+            // Create Bill for Lab
+            var bill = new Bill
+            {
+                BillNumber = $"LAB-{DateTime.UtcNow:yyyyMMdd}-{order.Id}",
+                PatientUserId = order.PatientUserId,
+                DoctorProfileId = order.DoctorProfileId,
+                BillSource = "Laboratory",
+                SourceReferenceId = order.Id,
+                Items = $"[{{\"name\": \"{order.TestType}\", \"price\": {price}}}]",
+                SubTotal = price,
+                TotalAmount = price,
+                Status = "Paid", // Lab tests usually paid at time of collection
+                PaymentMode = "Cash",
+                PaidAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Bills.Add(bill);
 
             await _context.SaveChangesAsync();
 
@@ -82,7 +104,8 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                     .SendAsync("LabReportReady", new { 
                         orderId = order.Id, 
                         patientName = patientName, 
-                        testType = order.TestType 
+                        testType = order.TestType,
+                        billAmount = price
                     });
             }
 
@@ -90,10 +113,11 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             await _hubContext.Clients.Group($"user-{order.PatientUserId}")
                 .SendAsync("LabReportReady", new { 
                     orderId = order.Id, 
-                    testType = order.TestType 
+                    testType = order.TestType,
+                    billAmount = price
                 });
 
-            return Ok(new { success = true, message = "Lab results updated successfully" });
+            return Ok(new { success = true, message = "Lab results updated and bill generated successfully", billAmount = price });
         }
 
         // POST api/laboratory/orders/{id}/email

@@ -25,8 +25,13 @@ namespace MediCore.API.Hubs
                 OnlineUsers[userId] = Context.ConnectionId;
                 // Auto-join personal group
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userId}");
-                // Broadcast online presence
+                
+                // Notify others
                 await Clients.Others.SendAsync("UserOnline", userId);
+                
+                // Send current online users back to the caller
+                var onlineIds = OnlineUsers.Keys.ToList();
+                await Clients.Caller.SendAsync("InitialOnlineUsers", onlineIds);
             }
             await base.OnConnectedAsync();
         }
@@ -145,6 +150,11 @@ namespace MediCore.API.Hubs
         public async Task SendMessage(string user, string message)
         {
             await Clients.All.SendAsync("ReceiveMessage", user, message);
+        }
+
+        public List<string> GetOnlineUsers()
+        {
+            return OnlineUsers.Keys.ToList();
         }
     }
 }

@@ -29,7 +29,9 @@ import { CallOverlayComponent } from './call-overlay.component';
           <div class="avatar">{{ otherUserName[0] | uppercase }}</div>
           <div>
             <h4>{{ otherUserName }}</h4>
-            <span class="status">● Online</span>
+            <span class="status" [class.online]="isOnline()">
+              ● {{ isOnline() ? 'Online' : 'Offline' }}
+            </span>
           </div>
         </div>
         <div class="header-actions">
@@ -185,6 +187,8 @@ import { CallOverlayComponent } from './call-overlay.component';
     .call-btn.video:hover { background: #2563eb; color: #fff; transform: scale(1.08); }
     .call-btn svg { width: 18px; height: 18px; }
     .enc-badge { font-size: 11px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
+    .status { font-size: 12px; color: #94a3b8; }
+    .status.online { color: #16a34a; font-weight: 600; }
   `]
 })
 export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
@@ -240,6 +244,10 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
       return 'Decrypting...';
     }
     return msg.message ?? '';
+  }
+
+  isOnline(): boolean {
+    return this.signalR.isUserOnline(String(this.otherUserId));
   }
 
   constructor() {

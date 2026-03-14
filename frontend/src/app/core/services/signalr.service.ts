@@ -179,16 +179,27 @@ export class SignalRService {
 
     // Typing indicator
     this.hubConnection.on('UserTyping', (fromUserId: string) => {
-      this.typingUserId.set(fromUserId);
-      setTimeout(() => this.typingUserId.set(null), 3000);
+      this.typingUserId.set(String(fromUserId));
+      setTimeout(() => {
+        if (this.typingUserId() === String(fromUserId)) {
+          this.typingUserId.set(null);
+        }
+      }, 3000);
     });
 
     // Online/offline presence
+    this.hubConnection.on('InitialOnlineUsers', (userIds: string[]) => {
+      console.log('Online users at connection:', userIds);
+      const stringIds = userIds.map(id => String(id));
+      this.onlineUserIds.set(new Set(stringIds));
+    });
     this.hubConnection.on('UserOnline', (userId: string) => {
-      this.onlineUserIds.update(s => { const n = new Set(s); n.add(userId); return n; });
+      console.log('User came online:', userId);
+      this.onlineUserIds.update(s => { const n = new Set(s); n.add(String(userId)); return n; });
     });
     this.hubConnection.on('UserOffline', (userId: string) => {
-      this.onlineUserIds.update(s => { const n = new Set(s); n.delete(userId); return n; });
+      console.log('User went offline:', userId);
+      this.onlineUserIds.update(s => { const n = new Set(s); n.delete(String(userId)); return n; });
     });
 
     this.hubConnection.on('ReceiveGroupMessage', (groupName: string, fromUserId: string, message: string) => {

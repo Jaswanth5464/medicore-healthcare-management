@@ -77,8 +77,18 @@
                 <span class="badge danger" *ngIf="order.criticalAlert" style="margin-left:4px">Critical</span>
               </td>
               <td>
-                <button class="action-btn primary small" *ngIf="order.status === 'Pending'" (click)="openUploadModal(order)">Upload Results</button>
-                <button class="action-btn secondary small" *ngIf="order.status === 'Completed' && order.reportUrl" (click)="viewReport(order.reportUrl)">View PDF</button>
+                <div class="status-stepper" *ngIf="order.status !== 'Completed'">
+                  <button class="step-btn" [class.active]="order.status === 'Pending'" (click)="updateOrderStatus(order.id, 'Collected')" title="Mark Sample Collected">🧪</button>
+                  <div class="step-line"></div>
+                  <button class="step-btn" [class.active]="order.status === 'Collected'" (click)="updateOrderStatus(order.id, 'In Lab')" title="Mark In Lab">🔬</button>
+                  <div class="step-line"></div>
+                  <button class="step-btn" [class.active]="order.status === 'In Lab'" (click)="updateOrderStatus(order.id, 'Processing')" title="Mark Processing">⚙️</button>
+                </div>
+
+                <div class="action-row" style="margin-top:10px;">
+                  <button class="action-btn primary small" *ngIf="order.status !== 'Completed'" (click)="openUploadModal(order)">Enter Results</button>
+                  <button class="action-btn secondary small" *ngIf="order.status === 'Completed' && order.reportUrl" (click)="viewReport(order.reportUrl)">View PDF</button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -160,8 +170,33 @@
       </div>
 
       <div class="form-group mb-4">
+        <label>Structured Test Results</label>
+        <table class="results-entry-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Value</th>
+              <th>Unit</th>
+              <th>Normal Range</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let res of labResults(); let i = index">
+              <td><input [(ngModel)]="res.parameter" placeholder="e.g. Hemoglobin"></td>
+              <td><input [(ngModel)]="res.value" style="width:80px;"></td>
+              <td><input [(ngModel)]="res.unit" style="width:60px;" placeholder="g/dL"></td>
+              <td><input [(ngModel)]="res.normalRange" placeholder="12 - 16"></td>
+              <td><button class="small-btn danger" (click)="removeResultRow(i)">×</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button class="action-btn secondary small mt-2" (click)="addResultRow()">+ Add Parameter</button>
+      </div>
+
+      <div class="form-group mb-4">
         <label>Technician Notes</label>
-        <textarea [(ngModel)]="uploadData.resultNotes" rows="3" placeholder="Any observational notes..."></textarea>
+        <textarea [(ngModel)]="uploadData.resultNotes" rows="2" placeholder="Any observational notes..."></textarea>
       </div>
 
       <div class="form-checkbox">

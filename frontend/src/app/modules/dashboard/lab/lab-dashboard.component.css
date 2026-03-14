@@ -431,3 +431,16 @@
 
 .text-red { color: #dc2626 !important; }
 .font-bold { font-weight: 700 !important; }
+.status-stepper { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.step-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #e2e8f0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; }
+.step-btn.active { border-color: #9333ea; background: #f3e8ff; box-shadow: 0 0 10px rgba(147, 51, 234, 0.2); }
+.step-line { flex: 1; height: 2px; background: #e2e8f0; min-width: 10px; }
+
+.results-entry-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.results-entry-table th { background: #f8fafc; padding: 10px; text-align: left; font-size: 12px; color: #64748b; border-bottom: 1px solid #e2e8f0; }
+.results-entry-table td { padding: 8px; border-bottom: 1px solid #f1f5f9; }
+.results-entry-table input { border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px; font-size: 13px; }
+.results-entry-table input:focus { border-color: #9333ea; outline: none; }
+
+.small-btn.danger { padding: 4px 8px; background: #fee2e2; color: #dc2626; border: none; border-radius: 4px; cursor: pointer; }
+.small-btn.danger:hover { background: #fecaca; }

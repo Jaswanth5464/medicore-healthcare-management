@@ -21,7 +21,7 @@ export class PharmacistDashboardComponent implements OnInit {
   private http = inject(HttpClient);
   private ns = inject(NotificationService);
 
-  activeTab = signal<'queue' | 'inventory' | 'chat'>('queue');
+  activeTab = signal<'queue' | 'inventory' | 'counter' | 'chat'>('queue');
   
   // Data
   queueStr = signal<any[]>([]);
@@ -32,8 +32,11 @@ export class PharmacistDashboardComponent implements OnInit {
   isDispensing = signal<boolean>(false);
   selectedPrescription = signal<any>(null);
 
-  // New Medicine Form
+  // New Medicine / Edit Form
   showAddMedicine = signal<boolean>(false);
+  isEditingMedicine = signal<boolean>(false);
+  editingMedicineId = signal<number | null>(null);
+  
   newMedicine = {
     medicineName: '',
     genericName: '',
@@ -44,6 +47,13 @@ export class PharmacistDashboardComponent implements OnInit {
     lowStockThreshold: 10,
     expiryDate: ''
   };
+
+  // Walk-in Counter State
+  walkInBasket = signal<any[]>([]);
+  walkInCustomer = signal({ name: '', phone: '', paymentMode: 'Cash' });
+  counterSearch = signal('');
+
+  filteredInventory = signal<any[]>([]);
 
   ngOnInit() {
     this.loadQueue();
@@ -70,11 +80,22 @@ export class PharmacistDashboardComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.inventoryData.set(res.data);
+          this.updateFilteredInventory();
         },
         error: (err) => {
           this.ns.error('Failed to load inventory');
         }
       });
+  }
+
+  updateFilteredInventory() {
+    const q = this.counterSearch().toLowerCase();
+    this.filteredInventory.set(
+      this.inventoryData().filter(m => 
+        m.medicineName.toLowerCase().includes(q) || 
+        m.genericName?.toLowerCase().includes(q)
+      )
+    );
   }
 
   viewPrescription(rx: any) {
@@ -88,10 +109,24 @@ export class PharmacistDashboardComponent implements OnInit {
   parseMedicines(medicinesJson: string): any[] {
     if (!medicinesJson) return [];
     try {
-      return JSON.parse(medicinesJson);
+      const meds = JSON.parse(medicinesJson);
+      // Map with prices from inventory for real-time display
+      return meds.map((m: any) => {
+        const invMed = this.inventoryData().find(i => i.name === m.name);
+        return {
+          ...m,
+          price: invMed?.price || 0,
+          stock: invMed?.stockQuantity || 0
+        };
+      });
     } catch {
       return [];
     }
+  }
+
+  calculateTotal(medicinesJson: string): number {
+    const meds = this.parseMedicines(medicinesJson);
+    return meds.reduce((acc, m) => acc + (m.price * (m.count || 1)), 0);
   }
 
   dispenseMedicines(rxId: number) {
@@ -124,26 +159,130 @@ export class PharmacistDashboardComponent implements OnInit {
       return;
     }
 
-    this.http.post<{success: boolean, data: any}>(`${this.BASE_URL}/api/pharmacy/inventory`, this.newMedicine)
+    if (this.isEditingMedicine()) {
+      this.http.put<{success: boolean}>(`${this.BASE_URL}/api/pharmacy/inventory/${this.editingMedicineId()}`, this.newMedicine)
+        .subscribe({
+          next: () => {
+            this.ns.success('Medicine updated successfully');
+            this.finishMedicineForm();
+          },
+          error: () => this.ns.error('Failed to update medicine')
+        });
+    } else {
+      this.http.post<{success: boolean, data: any}>(`${this.BASE_URL}/api/pharmacy/inventory`, this.newMedicine)
+        .subscribe({
+          next: (res) => {
+            this.ns.success('Medicine added successfully');
+            this.finishMedicineForm();
+          },
+          error: (err) => {
+            this.ns.error('Failed to add medicine');
+          }
+        });
+    }
+  }
+
+  editMedicine(med: any) {
+    this.isEditingMedicine.set(true);
+    this.editingMedicineId.set(med.id);
+    this.newMedicine = { ...med };
+    this.showAddMedicine.set(true);
+  }
+
+  deleteMedicine(id: number) {
+    if (!confirm('Are you sure you want to delete this medicine? This action cannot be undone.')) return;
+    this.http.delete(`${this.BASE_URL}/api/pharmacy/inventory/${id}`).subscribe({
+      next: () => {
+        this.ns.success('Medicine deleted');
+        this.loadInventory();
+      },
+      error: () => this.ns.error('Failed to delete medicine')
+    });
+  }
+
+  finishMedicineForm() {
+    this.showAddMedicine.set(false);
+    this.isEditingMedicine.set(false);
+    this.editingMedicineId.set(null);
+    this.loadInventory();
+    // Reset form
+    this.newMedicine = {
+      medicineName: '',
+      genericName: '',
+      category: '',
+      manufacturer: '',
+      price: 0,
+      stockQuantity: 0,
+      lowStockThreshold: 10,
+      expiryDate: ''
+    };
+  }
+
+  // WALK-IN COUNTER LOGIC
+  addToBasket(med: any) {
+    if (this.walkInBasket().find(i => i.id === med.id)) {
+      this.ns.warning('Medicine already in basket. Update quantity there.');
+      return;
+    }
+    if (med.stockQuantity <= 0) {
+      this.ns.error('Out of stock');
+      return;
+    }
+    this.walkInBasket.update(b => [...b, { ...med, quantity: 1 }]);
+  }
+
+  removeFromBasket(index: number) {
+    this.walkInBasket.update(b => {
+      const newB = [...b];
+      newB.splice(index, 1);
+      return newB;
+    });
+  }
+
+  updateItemQuantity(index: number, change: number) {
+    this.walkInBasket.update(b => {
+      const newB = [...b];
+      const item = newB[index];
+      const newQty = item.quantity + change;
+      if (newQty > 0 && newQty <= item.stockQuantity) {
+        newB[index] = { ...item, quantity: newQty };
+      } else if (newQty > item.stockQuantity) {
+        this.ns.error(`Only ${item.stockQuantity} items in stock`);
+      }
+      return newB;
+    });
+  }
+
+  get basketTotal() {
+    return this.walkInBasket().reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }
+
+  completeWalkInSale() {
+    if (this.walkInBasket().length === 0) {
+      this.ns.error('Basket is empty');
+      return;
+    }
+    
+    const payload = {
+      customerName: this.walkInCustomer().name || 'Walk-in Customer',
+      customerPhone: this.walkInCustomer().phone,
+      paymentMode: this.walkInCustomer().paymentMode,
+      items: this.walkInBasket().map(i => ({ medicineId: i.id, count: i.quantity }))
+    };
+
+    this.isLoading.set(true);
+    this.http.post<{success: boolean, billNumber: string}>(`${this.BASE_URL}/api/pharmacy/walk-in`, payload)
       .subscribe({
         next: (res) => {
-          this.ns.success('Medicine added successfully');
-          this.toggleAddMedicine();
+          this.ns.success(`Sale completed! Bill: ${res.billNumber}`);
+          this.walkInBasket.set([]);
+          this.walkInCustomer.set({ name: '', phone: '', paymentMode: 'Cash' });
           this.loadInventory();
-          // Reset form
-          this.newMedicine = {
-            medicineName: '',
-            genericName: '',
-            category: '',
-            manufacturer: '',
-            price: 0,
-            stockQuantity: 0,
-            lowStockThreshold: 10,
-            expiryDate: ''
-          };
+          this.isLoading.set(false);
         },
         error: (err) => {
-          this.ns.error('Failed to add medicine');
+          this.ns.error(err.error?.message || 'Failed to complete sale');
+          this.isLoading.set(false);
         }
       });
   }

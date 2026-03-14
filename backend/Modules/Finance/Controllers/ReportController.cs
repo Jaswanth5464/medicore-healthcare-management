@@ -39,11 +39,17 @@ namespace MediCore.API.Modules.Finance.Controllers
                 .SumAsync(b => b.TotalAmount);
 
             var revenueByDept = await _context.Bills
-                .Where(b => b.Status == "Paid")
+                .Where(b => b.Status == "Paid" && b.BillSource == "OPD" && b.AppointmentId != null)
                 .Include(b => b.Appointment)
                 .ThenInclude(a => a.Department)
-                .GroupBy(b => b.Appointment.Department.Name)
-                .Select(g => new { Department = g.Key, Amount = g.Sum(b => b.TotalAmount) })
+                .GroupBy(b => b.Appointment!.Department!.Name)
+                .Select(g => new { Department = g.Key ?? "General", Amount = g.Sum(b => b.TotalAmount) })
+                .ToListAsync();
+
+            var revenueBySource = await _context.Bills
+                .Where(b => b.Status == "Paid")
+                .GroupBy(b => b.BillSource)
+                .Select(g => new { Source = g.Key, Amount = g.Sum(b => b.TotalAmount) })
                 .ToListAsync();
 
             return Ok(new { 
@@ -51,7 +57,8 @@ namespace MediCore.API.Modules.Finance.Controllers
                 data = new {
                     totalRevenue,
                     revenueByDate,
-                    revenueByDept
+                    revenueByDept,
+                    revenueBySource
                 }
             });
         }

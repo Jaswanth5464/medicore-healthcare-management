@@ -634,37 +634,50 @@ interface UserListResponse {
             <span class="stat-value">{{ systemStats()?.totalAppointments || 0 }}</span>
           </div>
         </div>
-      </div>
+      </div>       <!-- Financial Reports -->
+       <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px;">
+         <!-- Dept Revenue Bar Chart -->
+         <div style="background:#fafbfc; border:1px solid #e2e8f0; border-radius:12px; padding:20px;">
+           <h3 style="font-size:15px; color:#0f172a; margin-bottom:16px;">Revenue by Department</h3>
+           <div style="display:flex; flex-direction:column; gap:12px;">
+              <div *ngIf="!reportData()?.revenueByDept || reportData()?.revenueByDept.length === 0" style="color:#64748b; font-size:13px;">No department revenue data.</div>
+              <div *ngFor="let item of reportData()?.revenueByDept" style="display:flex; align-items:center; gap:12px;">
+                  <div style="width:100px; font-size:12px; font-weight:600; color:#475569;">{{ item.department || 'General' }}</div>
+                  <div style="flex:1; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                     <div style="height:100%; background:#3b82f6; border-radius:4px;" [style.width]="(item.amount / reportData()?.totalRevenue * 100) + '%'"></div>
+                  </div>
+                  <div style="font-size:12px; font-weight:700; color:#0f172a;">₹{{ item.amount }}</div>
+              </div>
+           </div>
+         </div>
 
-      <!-- Financial Reports -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px;">
-        <!-- Dept Revenue Bar Chart (Simulated with Bars) -->
-        <div style="background:#fafbfc; border:1px solid #e2e8f0; border-radius:12px; padding:20px;">
-          <h3 style="font-size:15px; color:#0f172a; margin-bottom:16px;">Revenue by Department</h3>
-          <div style="display:flex; flex-direction:column; gap:12px;">
-             <div *ngIf="!reportData()?.revenueByDept || reportData()?.revenueByDept.length === 0" style="color:#64748b; font-size:13px;">No revenue data yet.</div>
-             <div *ngFor="let item of reportData()?.revenueByDept" style="display:flex; align-items:center; gap:12px;">
-                 <div style="width:100px; font-size:12px; font-weight:600; color:#475569;">{{ item.department }}</div>
-                 <div style="flex:1; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                    <!-- Simple inline width calculation based on total revenue logic, capped for UI -->
-                    <div style="height:100%; background:#3b82f6; border-radius:4px;" [style.width]="(item.amount / reportData()?.totalRevenue * 100) + '%'"></div>
-                 </div>
-                 <div style="font-size:12px; font-weight:700; color:#0f172a;">₹{{ item.amount }}</div>
-             </div>
-          </div>
-        </div>
-        
-        <!-- Quick Revenue -->
-        <div style="background:linear-gradient(135deg, #0f4c81, #0a2744); border-radius:12px; padding:24px; color:white; display:flex; flex-direction:column; justify-content:center;">
-           <span style="font-size:14px; opacity:0.8; margin-bottom:8px;">Total Hospital Revenue (30 Days)</span>
+         <!-- Source Revenue Pie/Multi-bar Chart -->
+         <div style="background:#fafbfc; border:1px solid #e2e8f0; border-radius:12px; padding:20px;">
+           <h3 style="font-size:15px; color:#0f172a; margin-bottom:16px;">Revenue by Source</h3>
+           <div style="display:flex; flex-direction:column; gap:12px;">
+              <div *ngIf="!reportData()?.revenueBySource || reportData()?.revenueBySource.length === 0" style="color:#64748b; font-size:13px;">No source revenue data.</div>
+              <div *ngFor="let item of reportData()?.revenueBySource" style="display:flex; align-items:center; gap:12px;">
+                  <div style="width:100px; font-size:12px; font-weight:600; color:#475569;">{{ item.source }}</div>
+                  <div style="flex:1; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                     <div style="height:100%; background:#8b5cf6; border-radius:4px;" [style.width]="(item.amount / reportData()?.totalRevenue * 100) + '%'"></div>
+                  </div>
+                  <div style="font-size:12px; font-weight:700; color:#0f172a;">₹{{ item.amount }}</div>
+              </div>
+           </div>
+         </div>
+       </div>
+
+       <!-- Total Summary Card -->
+       <div style="background:linear-gradient(135deg, #0f4c81, #0a2744); border-radius:12px; padding:24px; color:white; display:flex; flex-direction:column; justify-content:center; margin-bottom: 24px;">
+           <span style="font-size:14px; opacity:0.8; margin-bottom:8px;">Total Hospital Revenue (All Sources)</span>
            <span style="font-size:36px; font-weight:700;">₹{{ reportData()?.totalRevenue?.toLocaleString() || 0 }}</span>
            <div style="margin-top:16px; font-size:13px; opacity:0.9; display:flex; align-items:center; gap:6px;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-              Calculated from Paid Bills
+              Calculated from Appointments, Pharmacy & Lab
            </div>
+       </div>
         </div>
-      </div>
-
+        
       <!-- Audit Logs Section -->
       <div style="margin-top:40px;">
         <div class="section-header" style="border-bottom:none; margin-bottom:16px;">

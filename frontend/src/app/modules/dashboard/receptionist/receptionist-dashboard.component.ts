@@ -7,6 +7,7 @@ import { AppointmentCalendarComponent } from './appointment-calendar.component';
 import { AppointmentStateService } from '../../../core/services/appointment-state.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
+import { FinanceService } from '../../../core/services/finance.service';
 
 interface AppointmentRequest {
   id: number;
@@ -97,7 +98,7 @@ import { ConfigService } from '../../../core/services/config.service';
         <button *ngFor="let t of tabs" (click)="activeTab.set(t)" [class.active]="activeTab()===t" class="tab-btn">
           {{ t }}
           <span class="tab-badge" *ngIf="t === 'Requests' && pendingRequestsCount() > 0">{{ pendingRequestsCount() }}</span>
-          <span class="tab-badge" *ngIf="t === 'Cash Payments' && pendingPayments().length > 0">{{ pendingPayments().length }}</span>
+          <span class="tab-badge" *ngIf="t === 'Payment Center' && pendingPayments().length > 0">{{ pendingPayments().length }}</span>
         </button>
       </div>
 
@@ -159,39 +160,84 @@ import { ConfigService } from '../../../core/services/config.service';
           </table>
         </section>
 
-        <!-- CASH PAYMENTS TAB -->
-        <section *ngSwitchCase="'Cash Payments'" class="tab-section">
-          <div class="filter-bar">
-             <div class="section-title">Pending Cash Collections</div>
-             <button class="refresh-icon-btn" (click)="loadPendingPayments()" title="Refresh">
+        <!-- PAYMENT CENTER TAB -->
+        <section *ngSwitchCase="'Payment Center'" class="tab-section">
+          <div class="summary-bar" style="margin-bottom: 24px;">
+            <div class="summary-chip wait"><span>{{ pendingPayments().length }}</span>Pending</div>
+            <div class="summary-chip done"><span>{{ paymentLogs().length }}</span>Total Today</div>
+            <div style="flex:1"></div>
+            <button class="refresh-icon-btn" (click)="loadAllPayments()" title="Refresh All Data">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             </button>
           </div>
-          <div *ngIf="isLoadingPayments()" class="skeleton-list">
-            <div class="sk-row" *ngFor="let i of [1,2,3]"></div>
-          </div>
-          <div *ngIf="!isLoadingPayments() && pendingPayments().length === 0" class="empty-state">
-            <p>No pending cash payments at the moment.</p>
-          </div>
-          <div class="cards-grid" *ngIf="!isLoadingPayments()">
-            <div class="request-card" *ngFor="let p of pendingPayments()">
-              <div class="card-head">
-                <div>
-                  <strong class="card-name">{{ p.patientName }}</strong>
-                  <span class="card-meta">{{ p.tokenNumber }}</span>
+
+          <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap: 24px;">
+            <!-- Pending Collections -->
+            <div class="section-card" style="padding: 20px; background: #fff; border-radius: 16px;">
+              <div class="section-header" style="border:none; margin-bottom:12px;">
+                <h2 style="font-size:16px;">Pending Collections</h2>
+              </div>
+              
+              <div *ngIf="isLoadingPayments()" class="skeleton-list">
+                <div class="sk-row" *ngFor="let i of [1,2,3]"></div>
+              </div>
+              
+              <div *ngIf="!isLoadingPayments() && pendingPayments().length === 0" class="empty-state" style="padding: 40px;">
+                <p>No pending collections found.</p>
+              </div>
+
+              <div class="cards-grid" *ngIf="!isLoadingPayments() && pendingPayments().length > 0" style="grid-template-columns: 1fr;">
+                <div class="request-card" *ngFor="let p of pendingPayments()" style="border-left: 4px solid #f59e0b;">
+                  <div class="card-head">
+                    <div>
+                      <strong class="card-name">{{ p.patientName }}</strong>
+                      <span class="card-meta">Appt ID: #{{ p.id }} | Token: {{ p.tokenNumber }}</span>
+                    </div>
+                    <span class="status-badge pending">PENDING</span>
+                  </div>
+                  <div class="card-info">
+                    <div class="info-row"><label>Amount</label><span style="font-size:18px; font-weight:800; color:#10b981;">₹{{ p.consultationFee }}</span></div>
+                    <div class="info-row"><label>Doctor</label><span>Dr. {{ p.doctorName }}</span></div>
+                    <div class="info-row"><label>Dept</label><span>{{ p.departmentName }}</span></div>
+                    <div class="info-row"><label>Scheduled</label><span>{{ formatTime(p.timeSlot) }}</span></div>
+                  </div>
+                  <div class="card-actions">
+                    <button class="primary-btn" style="width:100%;" (click)="confirmCashPayment(p)">
+                      ✅ Approve & Check In
+                    </button>
+                  </div>
                 </div>
-                <span class="status-badge pending">CASH PENDING</span>
               </div>
-              <div class="card-info">
-                <div class="info-row"><label>Amount to Collect</label><span style="font-size:18px; font-weight:800; color:#10b981;">₹{{ p.consultationFee }}</span></div>
-                <div class="info-row"><label>Doctor</label><span>Dr. {{ p.doctorName }}</span></div>
-                <div class="info-row"><label>Department</label><span>{{ p.departmentName }}</span></div>
-                <div class="info-row"><label>Appt Date</label><span>{{ p.appointmentDate | date:'dd MMM' }} | {{ formatTime(p.timeSlot) }}</span></div>
+            </div>
+
+            <!-- Recent Transactions / Audit -->
+            <div class="section-card" style="padding: 20px; background: #f8fafc; border-radius: 16px; border: 1.5px dashed #e2e8f0;">
+              <div class="section-header" style="border:none; margin-bottom:12px;">
+                <h2 style="font-size:16px;">Recent Transactions</h2>
               </div>
-              <div class="card-actions">
-                <button class="primary-btn" style="width:100%;" (click)="confirmCashPayment(p)">
-                  ✅ Confirm Cash Received
-                </button>
+              
+              <div class="audit-stream" style="display:flex; flex-direction:column; gap:12px;">
+                <div *ngIf="paymentLogs().length === 0" class="empty-state" style="padding: 20px;">
+                  <p style="font-size:12px;">No transactions recorded yet.</p>
+                </div>
+                
+                <div class="audit-item" *ngFor="let log of paymentLogs() | slice:0:10" style="display:flex; align-items:center; gap:12px; padding:12px; background:#fff; border-radius:10px; border:1px solid #e2e8f0;">
+                  <div style="width:36px; height:36px; border-radius:8px; background:#eff6ff; color:#3b82f6; display:flex; align-items:center; justify-content:center;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                  </div>
+                  <div style="flex:1">
+                    <div style="font-size:13px; font-weight:700; color:#0f172a;">₹{{ log.totalAmount }}</div>
+                    <div style="font-size:11px; color:#64748b;">{{ log.patientName }} ({{ log.source }})</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font-size:10px; font-weight:700; color:#475569;">{{ log.paymentMode }}</div>
+                    <div style="font-size:9px; color:#94a3b8;">{{ log.paidAt | date:'HH:mm' }}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div style="margin-top:16px; text-align:center;">
+                <button class="filter-btn" style="font-size:11px; padding:4px 12px; border-radius:6px;" (click)="activeTab.set('OPD Queue')">View Queue</button>
               </div>
             </div>
           </div>
@@ -551,14 +597,17 @@ export class ReceptionistDashboardComponent implements OnInit {
   private readonly config = inject(ConfigService);
   private readonly BASE_URL = this.config.baseApiUrl;
   
-  tabs = ['Calendar', 'OPD Queue', 'Requests', 'Walk-in', 'Cash Payments', 'Staff Chat'];
+  tabs = ['Calendar', 'OPD Queue', 'Requests', 'Walk-in', 'Payment Center', 'Staff Chat'];
   activeTab = signal('OPD Queue');
   refreshInterval: any;
   calledPatientId = signal<number | null>(null);
 
-  // Cash Payments
+  // Payment Center
   pendingPayments = signal<any[]>([]);
+  paymentLogs = signal<any[]>([]);
   isLoadingPayments = signal(false);
+
+  private readonly financeService = inject(FinanceService);
 
 
   // Filters for Walk-in and Convert
@@ -636,12 +685,23 @@ export class ReceptionistDashboardComponent implements OnInit {
     this.loadRequests();
     this.loadDoctors();
     this.loadDepartments();
+    this.loadAllPayments();
+  }
+
+  loadAllPayments() {
     this.loadPendingPayments();
+    this.loadPaymentLogs();
+  }
+
+  loadPaymentLogs() {
+    this.financeService.getPaymentLogs().subscribe((res: any) => {
+      if (res.success) this.paymentLogs.set(res.data);
+    });
   }
 
   loadPendingPayments() {
     this.isLoadingPayments.set(true);
-    this.http.get<any>(`${this.BASE_URL}/api/appointments/pending-payments`, { headers: this.getHeaders() }).subscribe(res => {
+    this.http.get<any>(`${this.BASE_URL}/api/appointments/pending-payments`, { headers: this.getHeaders() }).subscribe((res: any) => {
       if (res.success) this.pendingPayments.set(res.data);
       this.isLoadingPayments.set(false);
     });
@@ -653,8 +713,8 @@ export class ReceptionistDashboardComponent implements OnInit {
     this.http.patch<any>(`${this.BASE_URL}/api/appointments/${p.id}/payment`, { paymentMode: 'Cash' }, { headers: this.getHeaders() })
       .subscribe(res => {
         if (res.success) {
-          this.notify.success(`Payment confirmed for ${p.patientName}. Bill auto-generated.`);
-          this.loadPendingPayments();
+          this.notify.success(`Payment confirmed for ${p.patientName}. Token ${p.tokenNumber} is now active.`);
+          this.loadAllPayments();
           this.state.loadToday(this.getHeaders());
         }
       });

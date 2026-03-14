@@ -45,24 +45,34 @@ namespace MediCore.API.Infrastructure.Database
 
             if (!await context.Medicines.AnyAsync())
             {
-                var meds = new List<Medicine>();
-                string[] categories = { "Tablet", "Capsule", "Syrup", "Injection", "Ointment" };
-                string[] prefixes = { "Para", "Amo", "Ceti", "Panto", "Vitam", "Ibu", "Azi", "Dicl", "Keto", "Ome" };
-                string[] suffixes = { "cetamol", "xicillin", "rizine", "prazole", "in C", "profen", "thromycin", "ofenac", "rolac", "prazole" };
-                
-                for(int i=0; i<50; i++)
+                var meds = new List<Medicine>
                 {
-                    meds.Add(new Medicine {
-                        Name = $"{prefixes[i%prefixes.Length]}{suffixes[(i/5)%suffixes.Length]} {250 + (i*50)}mg",
-                        GenericName = $"Generic Component {i}",
-                        Category = categories[i % categories.Length],
-                        Manufacturer = $"PharmaCo {(i % 5) + 1}",
-                        Price = (decimal)(10.0 + (i * 2.5)),
-                        StockQuantity = 100 + (i * 10),
-                        LowStockThreshold = 50,
-                        ExpiryDate = DateTime.UtcNow.AddMonths(12 + (i % 24))
-                    });
-                }
+                    new Medicine { Name = "Augmentin 625mg", GenericName = "Amoxicillin + Clavulanic Acid", Category = "Tablet", Manufacturer = "GSK", Price = 450.00m, StockQuantity = 200, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(18) },
+                    new Medicine { Name = "Panadol 500mg", GenericName = "Paracetamol", Category = "Tablet", Manufacturer = "GSK", Price = 30.00m, StockQuantity = 500, LowStockThreshold = 100, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Metformin 500mg", GenericName = "Metformin Hydrochloride", Category = "Tablet", Manufacturer = "Merck", Price = 120.00m, StockQuantity = 300, LowStockThreshold = 100, ExpiryDate = DateTime.UtcNow.AddMonths(20) },
+                    new Medicine { Name = "Lipitor 20mg", GenericName = "Atorvastatin", Category = "Tablet", Manufacturer = "Pfizer", Price = 850.00m, StockQuantity = 150, LowStockThreshold = 40, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Amlodipine 5mg", GenericName = "Amlodipine Besylate", Category = "Tablet", Manufacturer = "Sandoz", Price = 90.00m, StockQuantity = 400, LowStockThreshold = 80, ExpiryDate = DateTime.UtcNow.AddMonths(22) },
+                    new Medicine { Name = "Azithromycin 500mg", GenericName = "Azithromycin", Category = "Tablet", Manufacturer = "Pfizer", Price = 220.00m, StockQuantity = 250, LowStockThreshold = 60, ExpiryDate = DateTime.UtcNow.AddMonths(15) },
+                    new Medicine { Name = "Pantoprazole 40mg", GenericName = "Pantoprazole", Category = "Capsule", Manufacturer = "Takeda", Price = 180.00m, StockQuantity = 300, LowStockThreshold = 70, ExpiryDate = DateTime.UtcNow.AddMonths(12) },
+                    new Medicine { Name = "Cetirizine 10mg", GenericName = "Cetirizine Hydrochloride", Category = "Tablet", Manufacturer = "Dr. Reddy's", Price = 45.00m, StockQuantity = 400, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Ibuprofen 400mg", GenericName = "Ibuprofen", Category = "Tablet", Manufacturer = "Abbott", Price = 65.00m, StockQuantity = 350, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(18) },
+                    new Medicine { Name = "Amoxicillin 500mg", GenericName = "Amoxicillin", Category = "Capsule", Manufacturer = "Sandoz", Price = 150.00m, StockQuantity = 200, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(18) },
+                    new Medicine { Name = "Ciprofloxacin 500mg", GenericName = "Ciprofloxacin", Category = "Tablet", Manufacturer = "Bayer", Price = 280.00m, StockQuantity = 180, LowStockThreshold = 40, ExpiryDate = DateTime.UtcNow.AddMonths(18) },
+                    new Medicine { Name = "Omeprazole 20mg", GenericName = "Omeprazole", Category = "Capsule", Manufacturer = "AstraZeneca", Price = 140.00m, StockQuantity = 250, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(12) },
+                    new Medicine { Name = "Losartan 50mg", GenericName = "Losartan Potassium", Category = "Tablet", Manufacturer = "Merck", Price = 110.00m, StockQuantity = 200, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Gabapentin 300mg", GenericName = "Gabapentin", Category = "Capsule", Manufacturer = "Pfizer", Price = 380.00m, StockQuantity = 100, LowStockThreshold = 30, ExpiryDate = DateTime.UtcNow.AddMonths(12) },
+                    new Medicine { Name = "Hydrochlorothiazide 25mg", GenericName = "Hydrochlorothiazide", Category = "Tablet", Manufacturer = "Sandoz", Price = 55.00m, StockQuantity = 300, LowStockThreshold = 100, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Sertraline 50mg", GenericName = "Sertraline Hydrochloride", Category = "Tablet", Manufacturer = "Pfizer", Price = 520.00m, StockQuantity = 120, LowStockThreshold = 30, ExpiryDate = DateTime.UtcNow.AddMonths(18) },
+                    new Medicine { Name = "Simvastatin 20mg", GenericName = "Simvastatin", Category = "Tablet", Manufacturer = "Merck", Price = 190.00m, StockQuantity = 180, LowStockThreshold = 40, ExpiryDate = DateTime.UtcNow.AddMonths(22) },
+                    new Medicine { Name = "Montelukast 10mg", GenericName = "Montelukast Sodium", Category = "Tablet", Manufacturer = "Merck", Price = 240.00m, StockQuantity = 200, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(20) },
+                    new Medicine { Name = "Rosuvastatin 10mg", GenericName = "Rosuvastatin Calcium", Category = "Tablet", Manufacturer = "AstraZeneca", Price = 420.00m, StockQuantity = 150, LowStockThreshold = 40, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Ventolin Inhaler", GenericName = "Albuterol", Category = "Inhaler", Manufacturer = "GSK", Price = 650.00m, StockQuantity = 80, LowStockThreshold = 20, ExpiryDate = DateTime.UtcNow.AddMonths(12) },
+                    new Medicine { Name = "Metoprolol 50mg", GenericName = "Metoprolol Tartrate", Category = "Tablet", Manufacturer = "Novartis", Price = 135.00m, StockQuantity = 220, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Furosemide 40mg", GenericName = "Furosemide", Category = "Tablet", Manufacturer = "Sanofi", Price = 45.00m, StockQuantity = 300, LowStockThreshold = 80, ExpiryDate = DateTime.UtcNow.AddMonths(24) },
+                    new Medicine { Name = "Prednisone 5mg", GenericName = "Prednisone", Category = "Tablet", Manufacturer = "Upjohn", Price = 75.00m, StockQuantity = 150, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(18) },
+                    new Medicine { Name = "Levothyroxine 50mcg", GenericName = "Levothyroxine Sodium", Category = "Tablet", Manufacturer = "AbbVie", Price = 340.00m, StockQuantity = 250, LowStockThreshold = 50, ExpiryDate = DateTime.UtcNow.AddMonths(20) },
+                    new Medicine { Name = "Multivitamin Complex", GenericName = "Vitamin Supplement", Category = "Tablet", Manufacturer = "Centrum", Price = 950.00m, StockQuantity = 100, LowStockThreshold = 25, ExpiryDate = DateTime.UtcNow.AddMonths(12) }
+                };
                 context.Medicines.AddRange(meds);
             }
             

@@ -11,7 +11,7 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
 {
     [ApiController]
     [Route("api/pharmacy")]
-    [Authorize(Roles = "SuperAdmin,HospitalAdmin,Pharmacist")]
+    [Authorize(Roles = "SuperAdmin,HospitalAdmin,Pharmacist,Doctor")]
     public class PharmacyController : ControllerBase
     {
         private readonly MediCoreDbContext _context;

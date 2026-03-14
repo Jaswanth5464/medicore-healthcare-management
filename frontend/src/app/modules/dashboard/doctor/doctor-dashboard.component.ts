@@ -9,6 +9,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { ConfigService } from '../../../core/services/config.service';
 import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
 import { PatientDoctorChatComponent } from '../../communication/chat/patient-doctor-chat.component';
+import { SignalRService } from '../../../core/services/signalr.service';
 
 // const BASE_URL = 'https://localhost:7113';
 
@@ -49,6 +50,9 @@ import { PatientDoctorChatComponent } from '../../communication/chat/patient-doc
           </button>
           <button [class.active]="activeTab() === 'hospital-chat'" (click)="activeTab.set('hospital-chat')">
             Staff Chat
+          </button>
+          <button [class.active]="activeTab() === 'patient-chat'" (click)="openPatientChatTab()">
+            Patients Chat
           </button>
         </div>
 
@@ -264,6 +268,41 @@ import { PatientDoctorChatComponent } from '../../communication/chat/patient-doc
              <app-hospital-chat></app-hospital-chat>
           </div>
 
+          <!-- PATIENT CHAT TAB -->
+          <div *ngIf="activeTab() === 'patient-chat'" class="fade-in patient-chat-container">
+            <div class="chat-layout">
+              <div class="partner-list">
+                <div class="partner-header">Patients</div>
+                <div *ngIf="loadingPartners()" class="p-4 text-center text-sm text-slate-500">Loading...</div>
+                <div *ngIf="!loadingPartners() && chatPartners().length === 0" class="p-4 text-center text-sm text-slate-500">No recent chats</div>
+                <div *ngFor="let p of chatPartners()" 
+                     class="chat-partner-item" 
+                     [class.active]="selectedPartner()?.id === p.id"
+                     (click)="selectedPartner.set(p)">
+                  <div class="partner-avatar">{{ p.fullName[0] }}</div>
+                  <div class="partner-info">
+                    <div class="partner-name">{{ p.fullName }}</div>
+                    <div class="partner-role">Patient</div>
+                  </div>
+                  <div *ngIf="isUserOnline(p.id)" class="online-indicator"></div>
+                </div>
+              </div>
+              <div class="chat-main">
+                <div *ngIf="!selectedPartner()" class="no-selection">
+                   <div class="icon">💬</div>
+                   <p>Select a patient to start chatting</p>
+                </div>
+                <app-patient-doctor-chat 
+                  *ngIf="selectedPartner()"
+                  [otherUserId]="selectedPartner()!.id" 
+                  [otherUserName]="selectedPartner()!.fullName"
+                  [isMini]="false"
+                  (close)="selectedPartner.set(null)">
+                </app-patient-doctor-chat>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -379,6 +418,21 @@ import { PatientDoctorChatComponent } from '../../communication/chat/patient-doc
     .prescribed-list th { background: #f8fafc; padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; }
     .prescribed-list td { padding: 12px; border-top: 1px solid #f1f5f9; vertical-align: middle; }
     .prescribed-list input { padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; }
+
+    .patient-chat-container { height: calc(100vh - 200px); border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #fff; }
+    .chat-layout { display: flex; height: 100%; }
+    .partner-list { width: 260px; border-right: 1px solid #f1f5f9; display: flex; flex-direction: column; background: #fcfdfe; }
+    .partner-header { padding: 16px; font-weight: 700; font-size: 15px; color: #0f172a; border-bottom: 1px solid #f1f5f9; background: #fff; }
+    .chat-partner-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f8fafc; transition: 0.2s; position: relative; }
+    .chat-partner-item:hover { background: #f1f5f9; }
+    .chat-partner-item.active { background: #eff6ff; border-left: 3px solid #3b82f6; }
+    .partner-avatar { width: 36px; height: 36px; border-radius: 50%; background: #e0f2fe; color: #0369a1; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    .partner-name { font-size: 14px; font-weight: 600; color: #1e293b; }
+    .partner-role { font-size: 11px; color: #64748b; }
+    .online-indicator { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; position: absolute; bottom: 12px; left: 40px; }
+    .chat-main { flex: 1; display: flex; flex-direction: column; background: #f8fafc; }
+    .no-selection { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; }
+    .no-selection .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
   `]
 })
 export class DoctorDashboardComponent implements OnInit {
@@ -394,6 +448,11 @@ export class DoctorDashboardComponent implements OnInit {
   myProfile = signal<any>(null);
   loadingProfile = signal(true);
   myLeaves = signal<any[]>([]);
+
+  // Patient Chat Tab State
+  chatPartners = signal<any[]>([]);
+  selectedPartner = signal<any>(null);
+  loadingPartners = signal(false);
 
   // Forms
   leaveForm = { startDate: '', endDate: '', reason: '' };
@@ -703,5 +762,33 @@ export class DoctorDashboardComponent implements OnInit {
 
   isMedSelected(name: string): boolean {
     return this.prescribedMeds().some(m => m.name === name);
+  }
+
+  // Patient Chat Implementation
+  openPatientChatTab() {
+    this.activeTab.set('patient-chat');
+    this.loadChatPartners();
+  }
+
+  loadChatPartners() {
+    this.loadingPartners.set(true);
+    this.http.get<any>(`${this.BASE_URL}/api/chat/patient-doctor/partners`, { headers: this.getHeaders() })
+      .subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.chatPartners.set(res.data);
+          }
+          this.loadingPartners.set(false);
+        },
+        error: () => {
+          this.loadingPartners.set(false);
+          this.notify.error('Failed to load patients list.');
+        }
+      });
+  }
+
+  private signalR = inject(SignalRService);
+  isUserOnline(userId: string): boolean {
+    return this.signalR.isUserOnline(userId);
   }
 }

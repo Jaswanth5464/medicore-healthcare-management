@@ -118,14 +118,7 @@ builder.Services.AddSingleton<IEmailService, EmailService>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
-// Custom UserIdProvider for SignalR
-public class NameUserIdProvider : IUserIdProvider
-{
-    public string? GetUserId(HubConnectionContext connection)
-    {
-        return connection.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-    }
-}
+
 
 // ─── CORS ──────────────────────────────────────────────────────
 // Allows Angular running on port 4200 to call this API
@@ -177,3 +170,12 @@ app.MapControllers();
 app.MapHub<MediCoreHub>("/hubs/medicore");
 
 app.Run();
+
+// Custom UserIdProvider for SignalR
+public class NameUserIdProvider : IUserIdProvider
+{
+    public string? GetUserId(HubConnectionContext connection)
+    {
+        return connection.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    }
+}

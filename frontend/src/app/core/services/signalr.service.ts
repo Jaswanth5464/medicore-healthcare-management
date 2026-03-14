@@ -371,7 +371,7 @@ export class SignalRService {
   }
 
   // ── WebRTC Signaling ──────────────────────────────────────────────
-  incomingCall = signal<{ from: string; callType: string } | null>(null);
+  currentCall = signal<{ userId: string; userName: string; type: 'video' | 'audio'; isInitiator: boolean } | null>(null);
 
   // FIX: Stores handlers as named references so hubConnection.off() can remove
   // them by reference, preventing duplicate registrations across reconnects.
@@ -416,8 +416,16 @@ export class SignalRService {
     // deduplicated across reconnects. It is NOT stored in webRtcHandlers
     // because it is a service-level concern, not a component-level one.
     this.hubConnection.off('IncomingCall');
-    this.hubConnection.on('IncomingCall', (fromUserId: string, callType: string) => {
-      if (!this.isDndActive()) this.incomingCall.set({ from: fromUserId, callType });
+    this.hubConnection.on('IncomingCall', (fromUserId: string, fromName: string, callType: string) => {
+      console.log('SignalR: Incoming Call received', { fromUserId, fromName, callType });
+      if (!this.isDndActive()) {
+        this.currentCall.set({ 
+          userId: String(fromUserId), 
+          userName: fromName || 'Unknown Caller', 
+          type: (callType === 'video' ? 'video' : 'audio'),
+          isInitiator: false
+        });
+      }
     });
   }
 

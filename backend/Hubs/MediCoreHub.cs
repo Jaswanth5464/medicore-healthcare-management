@@ -114,8 +114,9 @@ namespace MediCore.API.Hubs
         public async Task SendCallRequest(string toUserId, string callType)
         {
             var fromUserId = Context.UserIdentifier ?? "Unknown";
+            var fromName = Context.User?.Identity?.Name ?? "MediCore User";
             await Clients.Group($"user-{toUserId}")
-                .SendAsync("IncomingCall", fromUserId, callType);
+                .SendAsync("IncomingCall", fromUserId, fromName, callType);
         }
 
         /// <summary>Accept or reject an incoming call.</summary>

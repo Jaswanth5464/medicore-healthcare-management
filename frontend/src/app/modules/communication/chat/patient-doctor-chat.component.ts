@@ -15,19 +15,9 @@ import { CallOverlayComponent } from './call-overlay.component';
 @Component({
   selector: 'app-patient-doctor-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, CallOverlayComponent],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="chat-wrapper" [class.mini]="isMini">
-      <!-- Active Call Overlay -->
-      <app-call-overlay
-        *ngIf="showCall()"
-        [callerName]="otherUserName"
-        [callType]="callType()"
-        [callerId]="otherUserId"
-        [isInitiator]="callInitiator()"
-        (callEnded)="showCall.set(false)">
-      </app-call-overlay>
-
       <div class="chat-header">
         <div class="user-info">
           <div class="avatar">{{ otherUserName[0] | uppercase }}</div>
@@ -213,9 +203,6 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
   previewUrl: string | null = null;
   lightboxUrl: string | null = null;
   isUploading = signal(false);
-  showCall = signal(false);
-  callType = signal<'video' | 'audio'>('video');
-  callInitiator = signal(false);
 
   // FIX: decryptionPending prevents getDecrypted() from scheduling duplicate
   // decrypt() Promises on every change-detection cycle, which previously
@@ -266,13 +253,6 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
   constructor() {
     effect(() => { this.activeMessages(); this.scrollToBottom(); });
-    this.signalR.onWebRtcEvent('IncomingCall', (from: string, type: string) => {
-      if (String(from) === String(this.otherUserId)) {
-        this.callType.set(type as 'video' | 'audio');
-        this.callInitiator.set(false);
-        this.showCall.set(true);
-      }
-    });
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -311,9 +291,12 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
    * SignalR handlers before the outgoing request is dispatched.
    */
   startCall(type: 'video' | 'audio') {
-    this.callType.set(type);
-    this.callInitiator.set(true);
-    this.showCall.set(true);
+    this.signalR.currentCall.set({
+      userId: String(this.otherUserId),
+      userName: this.otherUserName,
+      type: type,
+      isInitiator: true
+    });
     setTimeout(() => this.signalR.sendCallRequest(this.otherUserId, type), 0);
   }
 

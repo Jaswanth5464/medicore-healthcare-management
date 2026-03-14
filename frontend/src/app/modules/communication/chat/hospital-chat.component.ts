@@ -38,20 +38,10 @@ const ROLE_COLOR: Record<string, string> = {
 @Component({
   selector: 'app-hospital-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, CallOverlayComponent],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="hub-root" [class.dnd-active]="signalR.isDndActive()">
-      <!-- Call Overlay -->
-      <app-call-overlay
-        *ngIf="showCall()"
-        [callerName]="callPartnerName()"
-        [callType]="callType()"
-        [callerId]="callPartnerId()!"
-        [isInitiator]="callInitiator()"
-        (callEnded)="showCall.set(false)">
-      </app-call-overlay>
-
-      <!-- ========= SIDEBAR ========= -->
+      <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-top">
           <div class="brand">
@@ -490,11 +480,6 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   previewUrl: string | null = null;
   lightboxUrl: string | null = null;
   isSending = signal(false);
-  showCall = signal(false);
-  callType = signal<'video' | 'audio'>('video');
-  callInitiator = signal(false);
-  callPartnerId = signal<string | null>(null);
-  callPartnerName = signal<string>('Colleague');
   private typingTimeout: any = null;
 
   deptGroups = computed(() => {
@@ -553,14 +538,6 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   constructor() {
     this.loadStaff();
     effect(() => { this.activeMessages(); this.scrollToBottom(); });
-    this.signalR.onWebRtcEvent('IncomingCall', (from: string, type: string) => {
-      const caller = this.availableUsers().find(u => String(u.id) === String(from));
-      this.callPartnerId.set(String(from));
-      this.callPartnerName.set(caller?.fullName || 'Colleague');
-      this.callType.set(type as 'video' | 'audio');
-      this.callInitiator.set(false);
-      this.showCall.set(true);
-    });
   }
 
   ngAfterViewChecked() { this.scrollToBottom(); }
@@ -590,11 +567,12 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
    */
   startCall(type: 'video' | 'audio') {
     if (!this.selectedUserId()) return;
-    this.callPartnerId.set(this.selectedUserId());
-    this.callPartnerName.set(this.selectedUser()?.fullName || 'Colleague');
-    this.callType.set(type);
-    this.callInitiator.set(true);
-    this.showCall.set(true);
+    this.signalR.currentCall.set({
+      userId: String(this.selectedUserId()),
+      userName: this.selectedUser()?.fullName || 'Colleague',
+      type: type,
+      isInitiator: true
+    });
     setTimeout(() => this.signalR.sendCallRequest(this.selectedUserId()!, type), 0);
   }
 

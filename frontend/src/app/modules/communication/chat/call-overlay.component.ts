@@ -213,6 +213,12 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
       this.cleanup();
     } else {
       this.state.set('active');
+      // FIX: The offer is now sent ONLY after the receiver accepts.
+      // This ensures they are ready to handle the incoming signaling.
+      const offer = await this.pc!.createOffer();
+      await this.pc!.setLocalDescription(offer);
+      this.signalR.sendOffer(this.callerId, JSON.stringify(offer));
+      this.startTimer();
     }
   };
 
@@ -226,7 +232,7 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
 
     if (this.isInitiator) {
       this.state.set('calling');
-      this.startCall();
+      this.initLocalCall();
     } else {
       this.state.set('incoming');
     }
@@ -241,6 +247,7 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
     // was called inside handleRemoteOffer(), which ran before setupMedia() had
     // a chance to attach tracks — resulting in audio/video never being sent.
     this.createPeerConnection();
+    this.signalR.sendCallResponse(this.callerId, true);
 
     if (this.offerPending) {
       await this.handleRemoteOffer(this.offerPending);
@@ -252,13 +259,10 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
     this.cleanup();
   }
 
-  async startCall() {
+  async initLocalCall() {
     await this.setupMedia();
     this.createPeerConnection();
-    const offer = await this.pc!.createOffer();
-    await this.pc!.setLocalDescription(offer);
-    this.signalR.sendOffer(this.callerId, JSON.stringify(offer));
-    // NOTE: CallResponse is handled by onCallResponse registered in ngOnInit.
+    // Wait for CallResponse to send the actual offer
   }
 
   // FIX: handleRemoteOffer no longer calls createPeerConnection() — that is

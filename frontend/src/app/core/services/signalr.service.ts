@@ -62,14 +62,23 @@ export class SignalRService {
 
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(url, {
-        accessTokenFactory: () => token || ''
+        // Use a function that gets the LATEST token every time it connects or reconnects
+        accessTokenFactory: () => this.authService.getAccessToken() || ''
       })
-      .withAutomaticReconnect()
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: (retryContext: signalR.RetryContext) => {
+          if (retryContext.elapsedMilliseconds < 60000) return 2000;
+          return 10000;
+        }
+      })
       .build();
 
-    this.hubConnection.onreconnecting((err: any) => console.log('SignalR Reconnecting...', err));
-    this.hubConnection.onreconnected((id?: string) => console.log('SignalR Reconnected', id));
-    this.hubConnection.onclose((err: any) => console.log('SignalR Connection Closed', err));
+    this.hubConnection.onreconnecting((err: any) => console.log('SignalR: Reconnecting...', err));
+    this.hubConnection.onreconnected((id?: string) => {
+      console.log('SignalR: Reconnected', id);
+      this.joinUserGroups(); // Crucial to re-join role-based groups
+    });
+    this.hubConnection.onclose((err: any) => console.log('SignalR: Connection Closed', err));
 
     this.hubConnection.start()
       .then(() => {
@@ -165,15 +174,33 @@ export class SignalRService {
 
     // Listen for Chat Messages — Hub now sends (fromUserId, toUserId, message, imageUrl)
     this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, toUserId: string, message: string, imageUrl?: string) => {
+      console.log('SignalR: Received Chat Message', { fromUserId, message });
       // Ignore messages if DND is active
       if (this.isDndActive()) return;
+
+      const meId = String(this.authService.currentUser()?.id);
+      
+      // If I'm the sender (Echo from server), and I already have this message locally, skip
+      // Note: simplistic check using contents since we don't have stable IDs for all messages yet
+      const current = this.chatMessages();
+      const isEcho = String(fromUserId) === meId;
+      
+      if (isEcho) {
+        const alreadyExists = current.some(m => 
+          String(m.fromUserId) === meId && 
+          m.message === message && 
+          (new Date().getTime() - new Date(m.sentAt).getTime() < 5000)
+        );
+        if (alreadyExists) return;
+      }
+
       this.addChatMessage({
         fromUserId: String(fromUserId),
         toUserId: String(toUserId),
         message,
         imageUrl,
         sentAt: new Date(),
-        status: 'delivered'
+        status: isEcho ? 'sent' : 'delivered'
       });
     });
 

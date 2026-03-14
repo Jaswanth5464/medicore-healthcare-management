@@ -71,9 +71,12 @@ namespace MediCore.API.Hubs
         public async Task SendChatMessage(string toUserId, string encryptedMessage, string? imageUrl = null)
         {
             var fromUserId = Context.UserIdentifier ?? "Unknown";
+            Console.WriteLine($"SignalR: Relay message from {fromUserId} to {toUserId}");
+            
             // Relay to recipient — they see: from=sender, to=recipient
             await Clients.Group($"user-{toUserId}")
                 .SendAsync("ReceiveChatMessage", fromUserId, toUserId, encryptedMessage, imageUrl);
+            
             // Echo to sender — they see: from=sender, to=recipient (same)
             await Clients.Group($"user-{fromUserId}")
                 .SendAsync("ReceiveChatMessage", fromUserId, toUserId, encryptedMessage, imageUrl);

@@ -181,7 +181,6 @@ const ROLE_COLOR: Record<string, string> = {
               </div>
             </div>
 
-            <!-- Date separator logic via tracking -->
             <ng-container *ngFor="let msg of activeMessages(); let i = index">
               <div *ngIf="showDateSep(msg, i)" class="date-sep">
                 <span>{{ msg.sentAt | date:'EEEE, MMM d' }}</span>
@@ -268,14 +267,12 @@ const ROLE_COLOR: Record<string, string> = {
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     :host { display: block; height: 100%; width: 100%; overflow: hidden; }
 
-    /* ── Root ── */
     .hub-root {
       display: flex; height: 100%; width: 100%; background: #fff; overflow: hidden;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
     .hub-root.dnd-active { border: 2px solid #f59e0b; }
 
-    /* ── Sidebar ── */
     .sidebar {
       width: 290px; flex-shrink: 0; background: #fff;
       border-right: 1px solid #e2e8f0;
@@ -285,7 +282,8 @@ const ROLE_COLOR: Record<string, string> = {
       padding: 16px; display: flex; align-items: center; justify-content: space-between;
       border-bottom: 1px solid #f1f5f9; background: #f8fafc;
     }
-    .brand { display: flex; align-items: center; gap: 10px; }    .brand-logo {
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-logo {
       width: 34px; height: 34px; border-radius: 8px;
       background: linear-gradient(135deg,#1d4ed8,#3b82f6);
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -348,12 +346,10 @@ const ROLE_COLOR: Record<string, string> = {
     .spin { width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Chat Main ── */
     .chat-main {
       flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff;
       height: 100%; max-height: 100%; overflow: hidden;
     }
-    /* The pane that wraps header + messages + input when a user is selected */
     .chat-pane {
       flex: 1; display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;
     }
@@ -367,7 +363,6 @@ const ROLE_COLOR: Record<string, string> = {
     .feature-pills span { display: flex; align-items: center; gap: 5px; background: #fff; color: #1e293b; border: 1px solid #e2e8f0; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     .feature-pills span svg { width: 13px; height: 13px; flex-shrink: 0; }
 
-    /* Chat header */
     .chat-header {
       padding: 14px 20px; background: #fff; border-bottom: 1px solid #e2e8f0;
       display: flex; align-items: center; gap: 12px; flex-shrink: 0; z-index: 5;
@@ -380,7 +375,6 @@ const ROLE_COLOR: Record<string, string> = {
     .ch-status.online-text { color: #16a34a; font-weight: 600; }
     .ch-status.online-text::before { content: ''; display: inline-block; width: 6px; height: 6px; background: #22c55e; border-radius: 50%; }
     .ch-role-badge { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; flex-shrink: 0; letter-spacing: 0.3px; text-transform: uppercase; }
-    /* Call buttons in header */
     .hdr-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; background: #f8fafc; }
     .hdr-btn svg { width: 17px; height: 17px; }
     .hdr-btn.audio { color: #16a34a; }
@@ -388,7 +382,6 @@ const ROLE_COLOR: Record<string, string> = {
     .hdr-btn.video { color: #2563eb; }
     .hdr-btn.video:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
 
-    /* Messages area */
     .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
     .messages::-webkit-scrollbar { width: 4px; }
     .messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
@@ -398,12 +391,10 @@ const ROLE_COLOR: Record<string, string> = {
     .empty-bubble svg { width: 36px; height: 36px; stroke: #cbd5e1; display: block; margin: 0 auto 12px; }
     .empty-bubble p { margin: 0; color: #94a3b8; font-size: 14px; }
 
-    /* Date separator */
     .date-sep { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
     .date-sep::before, .date-sep::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
     .date-sep span { font-size: 11px; color: #94a3b8; font-weight: 600; white-space: nowrap; background: #f8fafc; padding: 2px 8px; border-radius: 20px; border: 1px solid #e2e8f0; }
 
-    /* Message rows */
     .msg-row { display: flex; align-items: flex-end; gap: 8px; max-width: 75%; animation: fadeMsg 0.22s ease; }
     @keyframes fadeMsg { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     .msg-row { align-self: flex-start; }
@@ -422,7 +413,6 @@ const ROLE_COLOR: Record<string, string> = {
     .bt { font-size: 10px; opacity: 0.65; }
     .status-ico { font-size: 11px; opacity: 0.9; }
 
-    /* Typing indicator */
     .typing-indicator { display: flex; align-items: center; gap: 8px; padding: 4px 0; margin-top: 4px; }
     .typing-dots { display: flex; gap: 4px; }
     .typing-dots span { width: 7px; height: 7px; background: #94a3b8; border-radius: 50%; animation: bounce 1.4s ease-in-out infinite; }
@@ -431,16 +421,13 @@ const ROLE_COLOR: Record<string, string> = {
     @keyframes bounce { 0%, 60%, 100% { transform: none; opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
     .typing-indicator span { font-size: 12px; color: #64748b; }
 
-    /* Image preview */
     .img-preview { padding: 10px 20px; background: #fff; border-top: 1px solid #f1f5f9; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .img-preview img { height: 56px; border-radius: 8px; border: 1px solid #e2e8f0; object-fit: cover; }
     .img-preview button { background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
-    /* DND banner */
     .dnd-banner { background: #fef3c7; border-top: 1px solid #fde68a; padding: 8px 20px; font-size: 13px; color: #92400e; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
     .dnd-banner button { background: #f59e0b; color: #fff; border: none; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
-    /* Input bar */
     .input-bar {
       padding: 16px 20px; background: #fff; border-top: 1px solid #f1f5f9;
       display: flex; gap: 12px; align-items: center; flex-shrink: 0;
@@ -471,7 +458,6 @@ const ROLE_COLOR: Record<string, string> = {
 
     .spin-sm { width: 20px; height: 20px; border: 2.5px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
-    /* Lightbox */
     .lightbox {
       position: fixed; inset: 0; background: rgba(0,0,0,0.88); display: flex; flex-direction: column;
       align-items: center; justify-content: center; z-index: 9999; cursor: zoom-out; gap: 14px;
@@ -489,7 +475,10 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   private config = inject(ConfigService);
   private crypto = inject(CryptoService);
 
-  /** Async decryption cache: msgKey → plaintext */
+  // FIX: decryptionPending tracks which message keys are already queued for
+  // decryption. Without this, getDecrypted() fires a new Promise on every
+  // change-detection cycle, causing an infinite signal-update loop.
+  private decryptionPending = new Set<number | string>();
   decryptedTexts = signal<Map<number | string, string>>(new Map());
 
   availableUsers = signal<any[]>([]);
@@ -508,7 +497,6 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   callPartnerName = signal<string>('Colleague');
   private typingTimeout: any = null;
 
-  /** Department-grouped users after search */
   deptGroups = computed(() => {
     const q = this.searchQuery.toLowerCase();
     const users = q
@@ -527,7 +515,6 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
       .map(([role, users]) => ({ label: ROLE_LABEL[role] || role, users }));
   });
 
-  /** Messages for the active conversation */
   activeMessages = computed(() => {
     const selId = this.selectedUserId();
     const meId = String(this.auth.currentUser()?.id);
@@ -539,30 +526,34 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   });
 
   /**
-   * Returns decrypted text for a message.
-   * If it starts with ENC: it's patient↔doctor encrypted — decrypt it async.
-   * For all other messages (staff↔staff), they're plaintext.
+   * FIX: Returns decrypted text for a message without triggering an infinite loop.
+   * Uses decryptionPending to ensure decrypt() is only called once per message,
+   * not on every Angular change-detection cycle.
    */
   getDecrypted(msg: ChatMessage): string {
     if (!msg.message?.startsWith('ENC:')) return msg.message ?? '';
     const key = msg.id ?? msg.sentAt.toString();
     const cache = this.decryptedTexts();
     if (cache.has(key)) return cache.get(key)!;
-    const myId = String(this.auth.currentUser()?.id);
-    // The other userId is whoever is NOT me
-    const otherId = String(msg.fromUserId) === myId ? String(msg.toUserId) : String(msg.fromUserId);
-    this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
-      this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, plain); return n; });
-    });
+    if (!this.decryptionPending.has(key)) {
+      this.decryptionPending.add(key);
+      const myId = String(this.auth.currentUser()?.id);
+      const otherId = String(msg.fromUserId) === myId ? String(msg.toUserId) : String(msg.fromUserId);
+      this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
+        this.decryptionPending.delete(key);
+        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, plain); return n; });
+      }).catch(() => {
+        this.decryptionPending.delete(key);
+        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, '[decryption error]'); return n; });
+      });
+    }
     return '⋯ Decrypting...';
   }
 
   constructor() {
     this.loadStaff();
     effect(() => { this.activeMessages(); this.scrollToBottom(); });
-    // Listen for incoming calls
     this.signalR.onWebRtcEvent('IncomingCall', (from: string, type: string) => {
-      // Find the user info from availableUsers
       const caller = this.availableUsers().find(u => String(u.id) === String(from));
       this.callPartnerId.set(String(from));
       this.callPartnerName.set(caller?.fullName || 'Colleague');
@@ -591,6 +582,12 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
     this.loadHistory(user.id);
   }
 
+  /**
+   * FIX: setTimeout(..., 0) defers sendCallRequest() by one tick so Angular
+   * can mount CallOverlayComponent and register its SignalR event handlers
+   * (including CallResponse) before the outgoing call request is sent.
+   * Without this, the CallResponse event arrives before the listener exists.
+   */
   startCall(type: 'video' | 'audio') {
     if (!this.selectedUserId()) return;
     this.callPartnerId.set(this.selectedUserId());
@@ -598,7 +595,7 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
     this.callType.set(type);
     this.callInitiator.set(true);
     this.showCall.set(true);
-    this.signalR.sendCallRequest(this.selectedUserId()!, type);
+    setTimeout(() => this.signalR.sendCallRequest(this.selectedUserId()!, type), 0);
   }
 
   loadHistory(toUserId: string) {
@@ -620,16 +617,29 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
     let imageUrl: string | undefined;
     if (this.selectedFile) {
       imageUrl = await this.toDataUrl(this.selectedFile);
-      this.selectedFile = null; this.previewUrl = null;
+      this.selectedFile = null;
+      this.previewUrl = null;
     }
 
     const msg = this.newMessage;
+    const myId = String(this.auth.currentUser()?.id);
     this.isSending.set(true);
+
     try {
-      await this.signalR.sendChatMessage(this.selectedUserId()!, msg, imageUrl);
+      // FIX: Encrypt the message before sending. Previously this component sent
+      // plaintext while getDecrypted() expected ENC: prefixed ciphertext — inconsistent.
+      const encrypted = await this.crypto.encrypt(msg, myId, this.selectedUserId()!);
+
+      // FIX: Register the encrypted form as a pending echo BEFORE invoking SignalR
+      // so that when the server echoes ENC:... back, it is suppressed by signalr.service.
+      this.signalR.markEcho(this.selectedUserId()!, encrypted);
+
+      await this.signalR.sendChatMessage(this.selectedUserId()!, encrypted, imageUrl);
+
+      // Add plaintext optimistically to local UI (never the ciphertext).
       this.signalR.chatMessages.update(ms => [...ms, {
         id: Date.now(),
-        fromUserId: String(this.auth.currentUser()?.id),
+        fromUserId: myId,
         toUserId: String(this.selectedUserId()!),
         message: msg,
         imageUrl,

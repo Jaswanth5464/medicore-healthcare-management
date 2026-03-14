@@ -10,6 +10,17 @@ import { SignalRService } from '../../../core/services/signalr.service';
  * - Signals via SignalR hub (offer/answer/ICE candidate)
  * - Supports both video and audio-only calls
  * - Fully destroyed on hang-up
+ *
+ * FIXES APPLIED:
+ * 1. All SignalR event handlers (including CallResponse) are registered in
+ *    ngOnInit — not inside startCall() — so they're never stacked on repeat calls.
+ * 2. Handlers are stored as named arrow functions so offWebRtcEvent() can remove
+ *    them by reference in ngOnDestroy, preventing leaks across overlay instances.
+ * 3. startTimer() is only called once, from onconnectionstatechange, with a guard
+ *    to prevent double-firing. The previous unconditional call in createPeerConnection()
+ *    was removed (it caused double-speed timer + a leaked interval).
+ * 4. accept() now calls createPeerConnection() before handleRemoteOffer() so that
+ *    the RTCPeerConnection always exists when the offer is processed.
  */
 @Component({
   selector: 'app-call-overlay',
@@ -153,8 +164,8 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
 
   private pc: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
+  private timerInterval: any = null;
   private callStart = 0;
-  private timerInterval: any;
   private offerPending: string | null = null;
   secondsElapsed = signal(0);
 
@@ -170,21 +181,48 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
     { urls: 'stun:stun1.l.google.com:19302' }
   ];
 
+  // FIX: Store handlers as named arrow functions so they can be removed by
+  // reference in ngOnDestroy via offWebRtcEvent(). Anonymous functions cannot
+  // be removed — this was causing listeners to leak across overlay instances.
+  private readonly onReceiveOffer = async (from: string, offer: string) => {
+    this.offerPending = offer;
+    // The offer will be processed when accept() is called (or immediately if
+    // already active, e.g. for mid-call renegotiation).
+    if (this.state() === 'active' && this.pc) {
+      await this.handleRemoteOffer(offer);
+    }
+  };
+
+  private readonly onReceiveAnswer = async (_from: string, answer: string) => {
+    if (this.pc) await this.pc.setRemoteDescription(JSON.parse(answer));
+  };
+
+  private readonly onReceiveIceCandidate = async (_from: string, candidate: string) => {
+    if (this.pc) {
+      try { await this.pc.addIceCandidate(JSON.parse(candidate)); } catch {}
+    }
+  };
+
+  private readonly onCallEnded = () => this.cleanup();
+
+  // FIX: CallResponse is now registered in ngOnInit alongside all other handlers,
+  // not inside startCall(). Previously it was added fresh on every call attempt,
+  // causing the handler to stack up and fire multiple times.
+  private readonly onCallResponse = async (_from: string, accepted: boolean) => {
+    if (!accepted) {
+      this.cleanup();
+    } else {
+      this.state.set('active');
+    }
+  };
+
   ngOnInit() {
-    // Register WebRTC signaling events
-    this.signalR.onWebRtcEvent('ReceiveOffer', async (from: string, offer: string) => {
-      this.offerPending = offer;
-      if (this.state() === 'active') await this.handleRemoteOffer(offer);
-    });
-    this.signalR.onWebRtcEvent('ReceiveAnswer', async (_from: string, answer: string) => {
-      if (this.pc) await this.pc.setRemoteDescription(JSON.parse(answer));
-    });
-    this.signalR.onWebRtcEvent('ReceiveIceCandidate', async (_from: string, candidate: string) => {
-      if (this.pc) {
-        try { await this.pc.addIceCandidate(JSON.parse(candidate)); } catch {}
-      }
-    });
-    this.signalR.onWebRtcEvent('CallEnded', () => this.cleanup());
+    // Register all WebRTC signaling events once here.
+    this.signalR.onWebRtcEvent('ReceiveOffer', this.onReceiveOffer);
+    this.signalR.onWebRtcEvent('ReceiveAnswer', this.onReceiveAnswer);
+    this.signalR.onWebRtcEvent('ReceiveIceCandidate', this.onReceiveIceCandidate);
+    this.signalR.onWebRtcEvent('CallEnded', this.onCallEnded);
+    this.signalR.onWebRtcEvent('CallResponse', this.onCallResponse);
 
     if (this.isInitiator) {
       this.state.set('calling');
@@ -197,7 +235,16 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
   async accept() {
     this.state.set('active');
     await this.setupMedia();
-    if (this.offerPending) await this.handleRemoteOffer(this.offerPending);
+
+    // FIX: Create the peer connection AFTER media is ready so local tracks are
+    // attached before the offer is processed. Previously createPeerConnection()
+    // was called inside handleRemoteOffer(), which ran before setupMedia() had
+    // a chance to attach tracks — resulting in audio/video never being sent.
+    this.createPeerConnection();
+
+    if (this.offerPending) {
+      await this.handleRemoteOffer(this.offerPending);
+    }
   }
 
   reject() {
@@ -211,19 +258,22 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
     const offer = await this.pc!.createOffer();
     await this.pc!.setLocalDescription(offer);
     this.signalR.sendOffer(this.callerId, JSON.stringify(offer));
-    // Listen for response
-    this.signalR.onWebRtcEvent('CallResponse', async (_from: string, accepted: boolean) => {
-      if (!accepted) this.cleanup();
-      else this.state.set('active');
-    });
+    // NOTE: CallResponse is handled by onCallResponse registered in ngOnInit.
   }
 
+  // FIX: handleRemoteOffer no longer calls createPeerConnection() — that is
+  // now the responsibility of accept() (for receiver) and startCall() (for
+  // initiator), both of which guarantee media is set up first.
   private async handleRemoteOffer(offerJson: string) {
-    this.createPeerConnection();
-    await this.pc!.setRemoteDescription(JSON.parse(offerJson));
-    const answer = await this.pc!.createAnswer();
-    await this.pc!.setLocalDescription(answer);
+    if (!this.pc) {
+      console.error('[WebRTC] handleRemoteOffer called before RTCPeerConnection was created');
+      return;
+    }
+    await this.pc.setRemoteDescription(JSON.parse(offerJson));
+    const answer = await this.pc.createAnswer();
+    await this.pc.setLocalDescription(answer);
     this.signalR.sendAnswer(this.callerId, JSON.stringify(answer));
+    this.offerPending = null;
   }
 
   private async setupMedia() {
@@ -249,19 +299,27 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
     this.pc.onicecandidate = e => {
       if (e.candidate) this.signalR.sendIceCandidate(this.callerId, JSON.stringify(e.candidate));
     };
+
     this.pc.ontrack = e => {
       setTimeout(() => {
         if (this.remoteVideoEl?.nativeElement)
           this.remoteVideoEl.nativeElement.srcObject = e.streams[0];
       }, 100);
     };
+
+    // FIX: startTimer() is only called here, guarded so it fires at most once.
+    // The previous code called startTimer() both inside onconnectionstatechange
+    // AND unconditionally right after creating the PC, causing a double-speed
+    // timer and a leaked interval reference.
     this.pc.onconnectionstatechange = () => {
-      if (this.pc?.connectionState === 'connected' && this.state() !== 'active') {
-        this.state.set('active');
-        this.startTimer();
+      if (this.pc?.connectionState === 'connected') {
+        if (this.state() !== 'active') this.state.set('active');
+        if (!this.timerInterval) this.startTimer();
+      }
+      if (this.pc?.connectionState === 'failed' || this.pc?.connectionState === 'disconnected') {
+        console.warn('[WebRTC] Connection state:', this.pc.connectionState);
       }
     };
-    this.startTimer();
   }
 
   private startTimer() {
@@ -288,11 +346,24 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
 
   private cleanup() {
     clearInterval(this.timerInterval);
+    this.timerInterval = null;
     this.localStream?.getTracks().forEach(t => t.stop());
+    this.localStream = null;
     this.pc?.close();
     this.pc = null;
+    this.offerPending = null;
     this.callEnded.emit();
   }
 
-  ngOnDestroy() { this.cleanup(); }
+  ngOnDestroy() {
+    // FIX: Remove all named handlers so they don't outlive this overlay instance.
+    // Without this, handlers accumulate in SignalRService.webRtcHandlers and fire
+    // for every subsequent call even after this component is destroyed.
+    this.signalR.offWebRtcEvent('ReceiveOffer', this.onReceiveOffer);
+    this.signalR.offWebRtcEvent('ReceiveAnswer', this.onReceiveAnswer);
+    this.signalR.offWebRtcEvent('ReceiveIceCandidate', this.onReceiveIceCandidate);
+    this.signalR.offWebRtcEvent('CallEnded', this.onCallEnded);
+    this.signalR.offWebRtcEvent('CallResponse', this.onCallResponse);
+    this.cleanup();
+  }
 }

@@ -1,4 +1,8 @@
-import { Component, signal, computed, inject, effect, ElementRef, ViewChild, AfterViewChecked, Input, OnChanges, SimpleChanges, Output, EventEmitter } from '@angular/core';
+import {
+  Component, signal, computed, inject, effect,
+  ElementRef, ViewChild, AfterViewChecked,
+  Input, OnChanges, SimpleChanges, Output, EventEmitter
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -178,7 +182,6 @@ import { CallOverlayComponent } from './call-overlay.component';
     .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: zoom-out; }
     .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 12px; object-fit: contain; }
 
-    /* Call buttons & security badge */
     .header-actions { display: flex; align-items: center; gap: 8px; }
     .call-btn { width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
     .call-btn.audio { background: #dcfce7; color: #16a34a; }
@@ -186,7 +189,7 @@ import { CallOverlayComponent } from './call-overlay.component';
     .call-btn.video { background: #eff6ff; color: #2563eb; }
     .call-btn.video:hover { background: #2563eb; color: #fff; transform: scale(1.08); }
     .call-btn svg { width: 18px; height: 18px; }
-    .enc-badge { font-size: 11px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
+    .enc-badge { font-size: 11px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 3px 8px; border-radius: 10px; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
     .status { font-size: 12px; color: #94a3b8; }
     .status.online { color: #16a34a; font-weight: 600; }
   `]
@@ -203,6 +206,7 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
   private auth = inject(AuthService);
   private config = inject(ConfigService);
   private signalR = inject(SignalRService);
+  private crypto = inject(CryptoService);
 
   newMessage = '';
   selectedFile: File | null = null;
@@ -213,9 +217,10 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
   callType = signal<'video' | 'audio'>('video');
   callInitiator = signal(false);
 
-  private crypto = inject(CryptoService);
-
-  /** Decrypted text cache: message-id → plaintext */
+  // FIX: decryptionPending prevents getDecrypted() from scheduling duplicate
+  // decrypt() Promises on every change-detection cycle, which previously
+  // caused an infinite loop of signal updates and UI re-renders.
+  private decryptionPending = new Set<number | string>();
   decryptedTexts = signal<Map<number | string, string>>(new Map());
 
   activeMessages = computed(() => {
@@ -229,21 +234,30 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
     ).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   });
 
-  /** Returns decrypted text for a message, scheduling decryption if needed. */
+  /**
+   * FIX: Returns decrypted text without causing an infinite signal loop.
+   * decryptionPending ensures each message is only decrypted once regardless
+   * of how many times Angular's change detection calls this method.
+   */
   getDecrypted(msg: ChatMessage): string {
     const key = msg.id ?? msg.sentAt.toString();
     const cache = this.decryptedTexts();
     if (cache.has(key)) return cache.get(key)!;
-    // Return raw while decryption is in progress (starts first time)
-    if (msg.message?.startsWith('ENC:')) {
+    if (!msg.message?.startsWith('ENC:')) return msg.message ?? '';
+
+    if (!this.decryptionPending.has(key)) {
+      this.decryptionPending.add(key);
       const myId = String(this.auth.currentUser()?.id);
       const otherId = String(this.otherUserId);
       this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
+        this.decryptionPending.delete(key);
         this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, plain); return n; });
+      }).catch(() => {
+        this.decryptionPending.delete(key);
+        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, '[decryption error]'); return n; });
       });
-      return 'Decrypting...';
     }
-    return msg.message ?? '';
+    return '⋯ Decrypting...';
   }
 
   isOnline(): boolean {
@@ -252,7 +266,6 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
   constructor() {
     effect(() => { this.activeMessages(); this.scrollToBottom(); });
-    // Listen for incoming calls from this specific user
     this.signalR.onWebRtcEvent('IncomingCall', (from: string, type: string) => {
       if (String(from) === String(this.otherUserId)) {
         this.callType.set(type as 'video' | 'audio');
@@ -266,6 +279,9 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
     if (changes['otherUserId'] && this.otherUserId) {
       this.loadHistory();
       this.signalR.activeChatPartner.set(this.otherUserId);
+      // Clear stale decryption state when switching conversation partners
+      this.decryptionPending.clear();
+      this.decryptedTexts.set(new Map());
     }
   }
 
@@ -284,11 +300,16 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
     });
   }
 
+  /**
+   * FIX: startCall now uses setTimeout(..., 0) to defer sendCallRequest() by
+   * one tick, allowing Angular to mount CallOverlayComponent and register its
+   * SignalR handlers before the outgoing request is dispatched.
+   */
   startCall(type: 'video' | 'audio') {
     this.callType.set(type);
     this.callInitiator.set(true);
     this.showCall.set(true);
-    this.signalR.sendCallRequest(this.otherUserId, type);
+    setTimeout(() => this.signalR.sendCallRequest(this.otherUserId, type), 0);
   }
 
   async sendMessage() {
@@ -303,18 +324,27 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
     const msg = this.newMessage;
     const myId = String(this.auth.currentUser()?.id);
-    // Encrypt before sending — server only sees ciphertext
+
+    // Encrypt before sending — the server only ever stores ciphertext.
     const encrypted = await this.crypto.encrypt(msg, myId, String(this.otherUserId));
+
+    // FIX: Register the encrypted payload as a pending echo BEFORE invoking
+    // SignalR. The server echoes the exact ciphertext we sent; without this,
+    // the echo arrives as a new incoming message and is displayed as a duplicate
+    // (especially visible as two bubbles — one plaintext, one "Decrypting...").
+    this.signalR.markEcho(String(this.otherUserId), encrypted);
+
     this.isUploading.set(true);
     try {
       await this.signalR.sendChatMessage(this.otherUserId, encrypted, imageUrl);
 
-      // Show plaintext in local UI (optimistic)
+      // Add plaintext optimistically so the sender sees their own message
+      // immediately without waiting for decryption on the next render.
       this.signalR.chatMessages.update(msgs => [...msgs, {
         id: Date.now(),
         fromUserId: myId,
         toUserId: String(this.otherUserId),
-        message: msg,
+        message: msg,   // plaintext for local display only
         imageUrl,
         sentAt: new Date()
       }]);
@@ -354,6 +384,6 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
   private scrollToBottom(): void {
     try { this.myScrollContainer.nativeElement.scrollTop = this.myScrollContainer.nativeElement.scrollHeight; }
-    catch(err) { }
+    catch {}
   }
 }

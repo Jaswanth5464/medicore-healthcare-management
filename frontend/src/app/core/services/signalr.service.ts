@@ -28,7 +28,7 @@ export interface ChatMessage {
 })
 export class SignalRService {
   private hubConnection: signalR.HubConnection | null = null;
-  
+
   // Real-time signals for UI components
   notifications = signal<Notification[]>([]);
   unreadCount = signal(0);
@@ -38,12 +38,15 @@ export class SignalRService {
   isDndActive = signal<boolean>(false);
   onlineUserIds = signal<Set<string>>(new Set());
   typingUserId = signal<string | null>(null);
-  
+
+  // FIX: Short-lived echo fingerprint set to prevent duplicate messages
+  // when the server echoes back an encrypted message we just sent.
+  private pendingEchoes = new Set<string>();
+
   constructor(
     private authService: AuthService,
     private configService: ConfigService
   ) {
-    // Automatically manage connection based on auth state using effect
     effect(() => {
       const user = this.authService.currentUser();
       if (user) {
@@ -57,12 +60,10 @@ export class SignalRService {
   private startConnection() {
     if (this.hubConnection?.state === signalR.HubConnectionState.Connected) return;
 
-    const token = this.authService.getAccessToken();
     const url = `${this.configService.baseApiUrl}/hubs/medicore`;
 
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(url, {
-        // Use a function that gets the LATEST token every time it connects or reconnects
         accessTokenFactory: () => this.authService.getAccessToken() || ''
       })
       .withAutomaticReconnect({
@@ -73,12 +74,14 @@ export class SignalRService {
       })
       .build();
 
-    this.hubConnection.onreconnecting((err: any) => console.log('SignalR: Reconnecting...', err));
+    this.hubConnection.onreconnecting((err: any) => console.log('SignalR Reconnecting...', err));
     this.hubConnection.onreconnected((id?: string) => {
-      console.log('SignalR: Reconnected', id);
-      this.joinUserGroups(); // Crucial to re-join role-based groups
+      console.log('SignalR Reconnected', id);
+      // Re-join groups and re-register events after reconnect
+      this.joinUserGroups();
+      this.registerEvents();
     });
-    this.hubConnection.onclose((err: any) => console.log('SignalR: Connection Closed', err));
+    this.hubConnection.onclose((err: any) => console.log('SignalR Connection Closed', err));
 
     this.hubConnection.start()
       .then(() => {
@@ -100,10 +103,8 @@ export class SignalRService {
     const user = this.authService.currentUser();
     if (!user || !this.hubConnection) return;
 
-    // join generic human group for individual notifications
     this.hubConnection.invoke('JoinGroup', `user-${user.id}`);
-    
-    // join group for specific roles
+
     if (user.roles?.includes('Receptionist') || user.roles?.includes('SuperAdmin') || user.roles?.includes('HospitalAdmin')) {
       this.hubConnection.invoke('JoinGroup', 'receptionist-group');
     }
@@ -112,86 +113,92 @@ export class SignalRService {
   private registerEvents() {
     if (!this.hubConnection) return;
 
-    // Listen for new appointment requests (Receptionists)
+    // FIX: Remove all existing handlers before re-registering to prevent
+    // duplicate handlers stacking up on every reconnect.
+    this.hubConnection.off('NewAppointmentRequest');
+    this.hubConnection.off('AppointmentStatusChanged');
+    this.hubConnection.off('PatientCheckedIn');
+    this.hubConnection.off('LabReportReady');
+    this.hubConnection.off('PaymentReceived');
+    this.hubConnection.off('ReceiveChatMessage');
+    this.hubConnection.off('UserTyping');
+    this.hubConnection.off('InitialOnlineUsers');
+    this.hubConnection.off('UserOnline');
+    this.hubConnection.off('UserOffline');
+    this.hubConnection.off('ReceiveGroupMessage');
+    this.hubConnection.off('ReceiveEmergencyAlert');
+
     this.hubConnection.on('NewAppointmentRequest', (data: { fullName: string }) => {
       this.addNotification({
         id: Math.random().toString(36),
         type: 'NEW_REQUEST',
         message: `New request from ${data.fullName}`,
         timestamp: new Date(),
-        data: data,
+        data,
         isRead: false
       });
     });
 
-    // Listen for status changes (Patients/Receptionists)
     this.hubConnection.on('AppointmentStatusChanged', (data: { tokenNumber: string, status: string }) => {
       this.addNotification({
         id: Math.random().toString(36),
         type: 'STATUS_CHANGED',
         message: `Appointment ${data.tokenNumber} status updated to ${data.status}`,
         timestamp: new Date(),
-        data: data,
+        data,
         isRead: false
       });
     });
 
-    // Listen for patient check-ins (Doctors)
     this.hubConnection.on('PatientCheckedIn', (data: { patientName: string, tokenNumber: string }) => {
       this.addNotification({
         id: Math.random().toString(36),
         type: 'CHECKED_IN',
         message: `Patient ${data.patientName} (${data.tokenNumber}) has arrived!`,
         timestamp: new Date(),
-        data: data,
+        data,
         isRead: false
       });
     });
 
-    // Listen for lab reports ready (Patients/Doctors)
     this.hubConnection.on('LabReportReady', (data: { testType: string }) => {
       this.addNotification({
         id: Math.random().toString(36),
         type: 'LAB_READY',
         message: `Lab result for ${data.testType} is now ready.`,
         timestamp: new Date(),
-        data: data,
+        data,
         isRead: false
       });
     });
 
-    // Listen for payments received (Receptionists/Admins)
     this.hubConnection.on('PaymentReceived', (data: { amount: number, patientName: string }) => {
       this.addNotification({
         id: Math.random().toString(36),
         type: 'PAYMENT_RECEIVED',
         message: `Received ₹${data.amount} from ${data.patientName}`,
         timestamp: new Date(),
-        data: data,
+        data,
         isRead: false
       });
     });
 
-    // Listen for Chat Messages — Hub now sends (fromUserId, toUserId, message, imageUrl)
+    // FIX: Echo deduplication now uses pendingEchoes fingerprint set,
+    // which correctly matches encrypted ciphertext echoed by the server.
     this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, toUserId: string, message: string, imageUrl?: string) => {
       console.log('SignalR: Received Chat Message', { fromUserId, message });
-      // Ignore messages if DND is active
+
       if (this.isDndActive()) return;
 
       const meId = String(this.authService.currentUser()?.id);
-      
-      // If I'm the sender (Echo from server), and I already have this message locally, skip
-      // Note: simplistic check using contents since we don't have stable IDs for all messages yet
-      const current = this.chatMessages();
       const isEcho = String(fromUserId) === meId;
-      
+
       if (isEcho) {
-        const alreadyExists = current.some(m => 
-          String(m.fromUserId) === meId && 
-          m.message === message && 
-          (new Date().getTime() - new Date(m.sentAt).getTime() < 5000)
-        );
-        if (alreadyExists) return;
+        const echoKey = `${toUserId}:${message}`;
+        if (this.pendingEchoes.has(echoKey)) {
+          this.pendingEchoes.delete(echoKey);
+          return;
+        }
       }
 
       this.addChatMessage({
@@ -204,7 +211,6 @@ export class SignalRService {
       });
     });
 
-    // Typing indicator
     this.hubConnection.on('UserTyping', (fromUserId: string) => {
       this.typingUserId.set(String(fromUserId));
       setTimeout(() => {
@@ -214,31 +220,25 @@ export class SignalRService {
       }, 3000);
     });
 
-    // Online/offline presence
     this.hubConnection.on('InitialOnlineUsers', (userIds: string[]) => {
       console.log('Online users at connection:', userIds);
-      const stringIds = userIds.map(id => String(id));
-      this.onlineUserIds.set(new Set(stringIds));
+      this.onlineUserIds.set(new Set(userIds.map(id => String(id))));
     });
+
     this.hubConnection.on('UserOnline', (userId: string) => {
       console.log('User came online:', userId);
       this.onlineUserIds.update(s => { const n = new Set(s); n.add(String(userId)); return n; });
     });
+
     this.hubConnection.on('UserOffline', (userId: string) => {
       console.log('User went offline:', userId);
       this.onlineUserIds.update(s => { const n = new Set(s); n.delete(String(userId)); return n; });
     });
 
     this.hubConnection.on('ReceiveGroupMessage', (groupName: string, fromUserId: string, message: string) => {
-      this.addChatMessage({
-        groupName,
-        fromUserId,
-        message,
-        sentAt: new Date()
-      });
+      this.addChatMessage({ groupName, fromUserId, message, sentAt: new Date() });
     });
-    
-    // Listen for Emergency Alerts
+
     this.hubConnection.on('ReceiveEmergencyAlert', (location: string, details: string) => {
       this.addNotification({
         id: Math.random().toString(36),
@@ -250,25 +250,21 @@ export class SignalRService {
       });
     });
 
-    // Register WebRTC signaling events
+    // FIX: WebRTC events are now registered via registerWebRtcEvents()
+    // which properly deduplicates using hubConnection.off() first.
     this.registerWebRtcEvents();
   }
 
   private addNotification(notif: Notification) {
-    const current = this.notifications();
-    this.notifications.set([notif, ...current].slice(0, 50)); // Keep last 50
+    this.notifications.set([notif, ...this.notifications()].slice(0, 50));
     this.updateUnreadCount();
-    
-    // Also trigger browser notification if possible
-    if (Notification.permission === "granted") {
-      new Notification("MediCore Alert", { body: notif.message });
+    if (Notification.permission === 'granted') {
+      new Notification('MediCore Alert', { body: notif.message });
     }
   }
 
   markAsRead(id: string) {
-    const current = this.notifications();
-    const updated = current.map(n => n.id === id ? { ...n, isRead: true } : n);
-    this.notifications.set(updated);
+    this.notifications.set(this.notifications().map(n => n.id === id ? { ...n, isRead: true } : n));
     this.updateUnreadCount();
   }
 
@@ -278,13 +274,24 @@ export class SignalRService {
   }
 
   private updateUnreadCount() {
-    const count = this.notifications().filter(n => !n.isRead).length;
-    this.unreadCount.set(count);
+    this.unreadCount.set(this.notifications().filter(n => !n.isRead).length);
   }
 
-  // Chat Methods
+  // ── Chat Methods ──────────────────────────────────────────────────
+
+  /**
+   * FIX: Mark an outgoing encrypted message so the server echo can be
+   * identified and suppressed in the ReceiveChatMessage handler.
+   * Call this BEFORE invoking sendChatMessage() with the encrypted payload.
+   */
+  markEcho(toUserId: string, encryptedMessage: string) {
+    const key = `${toUserId}:${encryptedMessage}`;
+    this.pendingEchoes.add(key);
+    // Auto-expire after 10s in case the echo never arrives
+    setTimeout(() => this.pendingEchoes.delete(key), 10000);
+  }
+
   async sendChatMessage(toUserId: string, message: string, imageUrl?: string): Promise<boolean> {
-    // Try SignalR first (real-time)
     if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
       try {
         await this.hubConnection.invoke('SendChatMessage', toUserId, message, imageUrl ?? null);
@@ -293,7 +300,6 @@ export class SignalRService {
         console.warn('SignalR send failed, falling back to HTTP', e);
       }
     }
-    // Fallback: HTTP POST
     try {
       const token = this.authService.getAccessToken();
       await fetch(`${this.configService.baseApiUrl}/api/chat/send`, {
@@ -334,22 +340,50 @@ export class SignalRService {
   // ── WebRTC Signaling ──────────────────────────────────────────────
   incomingCall = signal<{ from: string; callType: string } | null>(null);
 
-  private webRtcHandlers = new Map<string, Function[]>();
+  // FIX: Stores handlers as named references so hubConnection.off() can remove
+  // them by reference, preventing duplicate registrations across reconnects.
+  private webRtcHandlers = new Map<string, ((...args: any[]) => void)[]>();
 
   onWebRtcEvent(event: string, handler: (...args: any[]) => void) {
     if (!this.webRtcHandlers.has(event)) this.webRtcHandlers.set(event, []);
-    this.webRtcHandlers.get(event)!.push(handler);
-    // If hub already connected, register now
-    if (this.hubConnection) this.hubConnection.on(event, handler as any);
+    const handlers = this.webRtcHandlers.get(event)!;
+    // Prevent adding the same handler function twice
+    if (!handlers.includes(handler)) {
+      handlers.push(handler);
+    }
+    // Register on hub if already connected
+    if (this.hubConnection) {
+      this.hubConnection.off(event, handler as any);
+      this.hubConnection.on(event, handler as any);
+    }
+  }
+
+  /** Remove a specific WebRTC event handler (call from ngOnDestroy of overlay). */
+  offWebRtcEvent(event: string, handler: (...args: any[]) => void) {
+    const handlers = this.webRtcHandlers.get(event);
+    if (handlers) {
+      const idx = handlers.indexOf(handler);
+      if (idx !== -1) handlers.splice(idx, 1);
+    }
+    this.hubConnection?.off(event, handler as any);
   }
 
   private registerWebRtcEvents() {
-    // Re-register persisted handlers after reconnect
+    if (!this.hubConnection) return;
+
+    // FIX: Remove then re-add every stored handler to prevent stacking on reconnect.
     this.webRtcHandlers.forEach((handlers, event) => {
-      handlers.forEach(h => this.hubConnection?.on(event, h as any));
+      handlers.forEach(h => {
+        this.hubConnection!.off(event, h as any);
+        this.hubConnection!.on(event, h as any);
+      });
     });
-    // Incoming call signal
-    this.hubConnection?.on('IncomingCall', (fromUserId: string, callType: string) => {
+
+    // FIX: IncomingCall is registered here with off() guard so it's also
+    // deduplicated across reconnects. It is NOT stored in webRtcHandlers
+    // because it is a service-level concern, not a component-level one.
+    this.hubConnection.off('IncomingCall');
+    this.hubConnection.on('IncomingCall', (fromUserId: string, callType: string) => {
       if (!this.isDndActive()) this.incomingCall.set({ from: fromUserId, callType });
     });
   }
@@ -385,7 +419,6 @@ export class SignalRService {
   }
 
   private addChatMessage(msg: ChatMessage) {
-    const current = this.chatMessages();
-    this.chatMessages.set([...current, msg]);
+    this.chatMessages.set([...this.chatMessages(), msg]);
   }
 }

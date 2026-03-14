@@ -160,8 +160,10 @@ export class SignalRService {
 
     // Listen for Chat Messages
     this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, message: string, imageUrl?: string) => {
+      const currentUserId = this.authService.currentUser()?.id;
       this.addChatMessage({
-        fromUserId,
+        fromUserId: String(fromUserId),
+        toUserId: String(currentUserId),
         message,
         imageUrl,
         sentAt: new Date()

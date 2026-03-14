@@ -121,14 +121,17 @@ builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
 
 
-// ─── CORS ──────────────────────────────────────────────────────
-// Allows Angular running on port 4200 to call this API
-// Without this Angular requests will be blocked by browser
+// ─── CORS (SignalR-compatible) ──────────────────────────────────
+// Use explicit origins + built-in middleware (most reliable for SignalR + Elastic Beanstalk)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
     {
-        policy.SetIsOriginAllowed(origin => true) // TRUST ALL ORIGINS FOR NOW
+        policy.WithOrigins(
+                "http://medicore-frontend-jaswanth.s3-website-us-east-1.amazonaws.com",
+                "http://localhost:4200",
+                "https://localhost:4200"
+            )
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -138,25 +141,8 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // ─── Middleware Pipeline ───────────────────────────────────────
-// NUCLEAR CORS FIX: AT THE ABSOLUTE TOP TO CATCH PREFLIGHT OPTIONS
-app.Use(async (context, next) =>
-{
-    context.Response.Headers.Append("Access-Control-Allow-Origin", context.Request.Headers["Origin"]);
-    context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
-    context.Response.Headers.Append("Access-Control-Allow-Methods", "*");
-    context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");
-
-    if (context.Request.Method == "OPTIONS")
-    {
-        context.Response.StatusCode = 200;
-        await context.Response.WriteAsync("OK");
-        return;
-    }
-
-    await next();
-});
-
-// app.UseCors("AllowAngular"); // Replaced by manual middleware above
+// CORS must be FIRST (before Swagger, Auth, etc.) for SignalR negotiate to succeed
+app.UseCors("AllowAngular");
 
 // Enable Swagger in all environments for verification
 app.UseSwagger();

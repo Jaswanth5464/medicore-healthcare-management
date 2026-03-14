@@ -25,9 +25,9 @@ namespace MediCore.API.Modules.Communication.Controllers
 
         /// <summary>
         /// Returns the list of users this user is allowed to chat with.
-        /// - Staff can chat with other staff (role-based).
-        /// - Patients can ONLY chat with their assigned doctors.
-        /// - Doctors see ALL staff + their assigned patients.
+        /// - Patients can ONLY chat with their assigned doctors (confirmed appointments).
+        /// - Doctors see all staff + their assigned patients.
+        /// - Other staff see only other staff (not patients).
         /// </summary>
         [HttpGet("users")]
         public async Task<IActionResult> GetChatUsers()
@@ -44,18 +44,18 @@ namespace MediCore.API.Modules.Communication.Controllers
 
             if (isPatient)
             {
-                // Patients see ONLY their assigned doctors (via confirmed appointments)
+                // Patients see ONLY their confirmed doctors via DoctorProfile.UserId
                 var assignedDoctors = await _context.Appointments
-                    .Include(a => a.Doctor)
-                        .ThenInclude(d => d!.User)
+                    .Include(a => a.DoctorProfile)
+                        .ThenInclude(dp => dp.User)
                     .Where(a => a.PatientUserId == currentUserId
                              && a.Status == "Confirmed"
-                             && a.Doctor != null
-                             && a.Doctor.User != null)
+                             && a.DoctorProfile != null
+                             && a.DoctorProfile.User != null)
                     .Select(a => new
                     {
-                        Id = a.Doctor!.UserId.ToString(),
-                        FullName = a.Doctor.User!.FullName,
+                        Id = a.DoctorProfile.UserId.ToString(),
+                        FullName = a.DoctorProfile.User.FullName,
                         Role = "Doctor"
                     })
                     .Distinct()
@@ -68,7 +68,7 @@ namespace MediCore.API.Modules.Communication.Controllers
 
             if (isDoctor)
             {
-                // Doctors see staff + their assigned patients
+                // Doctors see all staff
                 var staff = await _context.Users
                     .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
                     .Where(u => u.IsActive && u.Id != currentUserId
@@ -81,7 +81,7 @@ namespace MediCore.API.Modules.Communication.Controllers
                     })
                     .ToListAsync();
 
-                // Get assigned patients
+                // Get doctor's own profile and assigned patients
                 var doctorProfile = await _context.DoctorProfiles
                     .FirstOrDefaultAsync(d => d.UserId == currentUserId);
 
@@ -95,13 +95,17 @@ namespace MediCore.API.Modules.Communication.Controllers
                         .Select(a => new
                         {
                             Id = a.PatientUserId.ToString(),
-                            FullName = a.PatientUser!.FullName,
+                            FullName = a.PatientUser.FullName,
                             Role = "Patient"
                         })
                         .Distinct()
                         .ToListAsync();
 
-                    var combined = staff.Concat(patients).DistinctBy(u => u.Id).ToList();
+                    var combined = staff
+                        .Concat(patients.Select(p => new { p.Id, p.FullName, p.Role }))
+                        .DistinctBy(u => u.Id)
+                        .ToList();
+
                     return Ok(new { success = true, data = combined });
                 }
 
@@ -130,16 +134,16 @@ namespace MediCore.API.Modules.Communication.Controllers
             var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (userId == null) return Unauthorized();
 
-            // Authorization guard: if current user is a Patient, verify the other user is their assigned doctor
+            // Patient access guard: verify the other user is their assigned doctor
             if (User.IsInRole("Patient") && !string.IsNullOrEmpty(withUserId))
             {
                 if (!int.TryParse(userId, out var patientId)) return Unauthorized();
                 var allowed = await _context.Appointments
-                    .Include(a => a.Doctor)
+                    .Include(a => a.DoctorProfile)
                     .AnyAsync(a => a.PatientUserId == patientId
                                 && a.Status == "Confirmed"
-                                && a.Doctor != null
-                                && a.Doctor.UserId.ToString() == withUserId);
+                                && a.DoctorProfile != null
+                                && a.DoctorProfile.UserId.ToString() == withUserId);
                 if (!allowed) return Forbid();
             }
 
@@ -169,21 +173,21 @@ namespace MediCore.API.Modules.Communication.Controllers
             {
                 if (!int.TryParse(userId, out var patientId)) return Unauthorized();
                 var allowed = await _context.Appointments
-                    .Include(a => a.Doctor)
+                    .Include(a => a.DoctorProfile)
                     .AnyAsync(a => a.PatientUserId == patientId
                                 && a.Status == "Confirmed"
-                                && a.Doctor != null
-                                && a.Doctor.UserId.ToString() == dto.ToUserId);
+                                && a.DoctorProfile != null
+                                && a.DoctorProfile.UserId.ToString() == dto.ToUserId);
                 if (!allowed) return Forbid();
             }
 
-            // Message is stored as received (already encrypted by client)
+            // Message is stored as-is (client sends AES-GCM ciphertext)
             var message = new ChatMessage
             {
                 FromUserId = userId,
                 ToUserId = dto.ToUserId ?? string.Empty,
                 GroupName = dto.GroupName,
-                Message = dto.Message,   // cipher text stored
+                Message = dto.Message,
                 ImageUrl = dto.ImageUrl,
                 SentAt = DateTime.UtcNow
             };

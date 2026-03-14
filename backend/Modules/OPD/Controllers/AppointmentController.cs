@@ -359,69 +359,75 @@ namespace MediCore.API.Modules.OPD.Controllers
             return Ok(new { success = true, message = $"Status updated to {dto.Status}" });
         }
 
-        // PATCH api/appointments/5/payment
         [HttpPatch("{id}/payment")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist,Patient")]
         public async Task<IActionResult> UpdatePayment(int id, [FromBody] UpdatePaymentDto dto)
         {
-            var appointment = await _context.Appointments.FindAsync(id);
-            if (appointment == null)
-                return NotFound(new { success = false, message = "Appointment not found" });
-
-            appointment.PaymentStatus = "Paid";
-            appointment.PaymentMode = dto.PaymentMode;
-            appointment.RazorpayPaymentId = dto.RazorpayPaymentId;
-            appointment.UpdatedAt = DateTime.UtcNow;
-
-            // Also mark the corresponding bill as paid
-            var bill = await _context.Bills.FirstOrDefaultAsync(b => b.AppointmentId == id);
-            if (bill == null)
+            try
             {
-                // If no bill exists yet (e.g. appointment not Completed), create one for the consultation fee
-                var now = DateTime.UtcNow;
-                var billCount = await _context.Bills.CountAsync(b => b.CreatedAt.Date == now.Date);
-                var billNumber = $"BILL{now:yyyyMMdd}{(billCount + 1):D3}";
-                
-                var items = new List<object> { new { description = "Consultation Fee", amount = appointment.ConsultationFee } };
-                
-                bill = new MediCore.API.Modules.Finance.Models.Bill
+                var appointment = await _context.Appointments.FindAsync(id);
+                if (appointment == null)
+                    return NotFound(new { success = false, message = "Appointment not found" });
+
+                appointment.PaymentStatus = "Paid";
+                appointment.PaymentMode = dto.PaymentMode;
+                appointment.RazorpayPaymentId = dto.RazorpayPaymentId;
+                appointment.UpdatedAt = DateTime.UtcNow;
+
+                // Also mark the corresponding bill as paid
+                var bill = await _context.Bills.FirstOrDefaultAsync(b => b.AppointmentId == id);
+                if (bill == null)
                 {
-                    BillNumber = billNumber,
-                    AppointmentId = appointment.Id,
-                    PatientUserId = appointment.PatientUserId,
-                    DoctorProfileId = appointment.DoctorProfileId,
-                    Items = System.Text.Json.JsonSerializer.Serialize(items),
-                    SubTotal = appointment.ConsultationFee,
-                    TotalAmount = appointment.ConsultationFee,
-                    Status = "Paid",
-                    PaymentMode = dto.PaymentMode,
-                    PaidAt = now,
-                    CreatedAt = now
-                };
-                _context.Bills.Add(bill);
+                    // If no bill exists yet (e.g. appointment not Completed), create one for the consultation fee
+                    var now = DateTime.UtcNow;
+                    var billCount = await _context.Bills.CountAsync(b => b.CreatedAt.Date == now.Date);
+                    var billNumber = $"BILL{now:yyyyMMdd}{(billCount + 1):D3}";
+                    
+                    var items = new List<object> { new { description = "Consultation Fee", amount = appointment.ConsultationFee } };
+                    
+                    bill = new MediCore.API.Modules.Finance.Models.Bill
+                    {
+                        BillNumber = billNumber,
+                        AppointmentId = appointment.Id,
+                        PatientUserId = appointment.PatientUserId,
+                        DoctorProfileId = appointment.DoctorProfileId,
+                        Items = System.Text.Json.JsonSerializer.Serialize(items),
+                        SubTotal = appointment.ConsultationFee,
+                        TotalAmount = appointment.ConsultationFee,
+                        Status = "Paid",
+                        PaymentMode = dto.PaymentMode,
+                        PaidAt = now,
+                        CreatedAt = now
+                    };
+                    _context.Bills.Add(bill);
+                }
+                else
+                {
+                    bill.Status = "Paid";
+                    bill.PaymentMode = dto.PaymentMode;
+                    bill.PaidAt = DateTime.UtcNow;
+                    bill.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Real-time notification: Payment Received
+                var patientNamePayment = await _context.Users.Where(u => u.Id == appointment.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
+                await _hubContext.Clients.Group(MediCoreHub.ReceptionistGroup)
+                    .SendAsync("PaymentReceived", new { 
+                        appointmentId = appointment.Id, 
+                        tokenNumber = appointment.TokenNumber,
+                        patientName = patientNamePayment,
+                        amount = bill.TotalAmount,
+                        mode = dto.PaymentMode
+                    });
+
+                return Ok(new { success = true, message = "Payment recorded and bill generated" });
             }
-            else
+            catch (Exception ex)
             {
-                bill.Status = "Paid";
-                bill.PaymentMode = dto.PaymentMode;
-                bill.PaidAt = DateTime.UtcNow;
-                bill.UpdatedAt = DateTime.UtcNow;
+                return StatusCode(500, new { success = false, message = ex.Message, inner = ex.InnerException?.Message });
             }
-
-            await _context.SaveChangesAsync();
-
-            // Real-time notification: Payment Received
-            var patientNamePayment = await _context.Users.Where(u => u.Id == appointment.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
-            await _hubContext.Clients.Group(MediCoreHub.ReceptionistGroup)
-                .SendAsync("PaymentReceived", new { 
-                    appointmentId = appointment.Id, 
-                    tokenNumber = appointment.TokenNumber,
-                    patientName = patientNamePayment,
-                    amount = bill.TotalAmount,
-                    mode = dto.PaymentMode
-                });
-
-            return Ok(new { success = true, message = "Payment recorded and bill generated" });
         }
 
         // POST api/appointments/5/request-offline-payment

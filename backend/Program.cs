@@ -127,11 +127,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
     {
-        policy.WithOrigins(
-                "http://medicore-frontend-jaswanth.s3-website-us-east-1.amazonaws.com",
-                "http://localhost:4200",
-                "https://localhost:4200"
-            )
+        policy.SetIsOriginAllowed(origin => true)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();

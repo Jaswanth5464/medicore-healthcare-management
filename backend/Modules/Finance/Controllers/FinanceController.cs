@@ -47,7 +47,7 @@ namespace MediCore.API.Modules.Finance.Controllers
         }
 
         [HttpGet("payment-logs")]
-        [Authorize(Roles = "SuperAdmin,HospitalAdmin")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist")]
         public async Task<IActionResult> GetPaymentLogs([FromQuery] int limit = 100)
         {
             var logs = await _context.Bills

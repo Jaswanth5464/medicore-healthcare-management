@@ -287,16 +287,21 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
   ngAfterViewChecked() { this.scrollToBottom(); }
 
+  /** Uses dedicated patient-doctor API (no appointment required) */
   loadHistory() {
-    this.http.get<any>(`${this.config.baseApiUrl}/api/chat/recent?withUserId=${this.otherUserId}`, {
+    const partnerId = String(this.otherUserId);
+    this.http.get<any>(`${this.config.baseApiUrl}/api/chat/patient-doctor/messages?partnerId=${encodeURIComponent(partnerId)}`, {
       headers: { Authorization: `Bearer ${this.auth.getAccessToken()}` }
-    }).subscribe(res => {
-      if (res.success && res.data?.length) {
-        const existing = this.signalR.chatMessages();
-        const existingIds = new Set(existing.map((e: any) => e.id));
-        const newOnes = res.data.filter((m: any) => m.id && !existingIds.has(m.id));
-        this.signalR.chatMessages.set([...existing, ...newOnes]);
-      }
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data?.length) {
+          const existing = this.signalR.chatMessages();
+          const existingIds = new Set(existing.map((e: any) => e.id));
+          const newOnes = res.data.filter((m: any) => m.id && !existingIds.has(m.id));
+          this.signalR.chatMessages.set([...existing, ...newOnes]);
+        }
+      },
+      error: () => { /* Silently ignore - user may not have access */ }
     });
   }
 
@@ -336,7 +341,7 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
     this.isUploading.set(true);
     try {
-      await this.signalR.sendChatMessage(String(this.otherUserId), encrypted, imageUrl);
+      await this.signalR.sendPatientDoctorMessage(String(this.otherUserId), encrypted, imageUrl);
 
       // Add plaintext optimistically so the sender sees their own message
       // immediately without waiting for decryption on the next render.

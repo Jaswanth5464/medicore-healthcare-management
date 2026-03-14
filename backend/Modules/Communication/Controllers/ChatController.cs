@@ -90,7 +90,7 @@ namespace MediCore.API.Modules.Communication.Controllers
                     var patients = await _context.Appointments
                         .Include(a => a.PatientUser)
                         .Where(a => a.DoctorProfileId == doctorProfile.Id
-                                 && a.Status == "Confirmed"
+                                 && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
                                  && a.PatientUser != null)
                         .Select(a => new
                         {
@@ -141,7 +141,7 @@ namespace MediCore.API.Modules.Communication.Controllers
                 var allowed = await _context.Appointments
                     .Include(a => a.DoctorProfile)
                     .AnyAsync(a => a.PatientUserId == patientId
-                                && a.Status == "Confirmed"
+                                && (a.Status == "Confirmed" || a.Status == "Scheduled" || a.Status == "CheckedIn")
                                 && a.DoctorProfile != null
                                 && a.DoctorProfile.UserId.ToString() == withUserId);
                 if (!allowed) return Forbid();

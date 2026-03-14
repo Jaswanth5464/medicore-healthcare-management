@@ -9,6 +9,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { SignalRService, ChatMessage } from '../../../core/services/signalr.service';
 import { ConfigService } from '../../../core/services/config.service';
 import { CallOverlayComponent } from './call-overlay.component';
+import { CryptoService } from '../../../core/services/crypto.service';
 
 const DEPT_ORDER: Record<string, number> = {
   Doctor: 1, Nurse: 2, Receptionist: 3, LabTechnician: 4,
@@ -143,7 +144,7 @@ const ROLE_COLOR: Record<string, string> = {
           </div>
         </div>
 
-        <ng-container *ngIf="selectedUserId()">
+        <div *ngIf="selectedUserId()" class="chat-pane">
 
           <!-- Header -->
           <div class="chat-header">
@@ -191,11 +192,17 @@ const ROLE_COLOR: Record<string, string> = {
                 </div>
                 <div class="bubble" [class.sent]="isMine(msg)">
                   <img *ngIf="msg.imageUrl" [src]="msg.imageUrl" class="bubble-img" (click)="lightboxUrl = msg.imageUrl!" />
-                  <p *ngIf="msg.message">{{ msg.message }}</p>
+                  <p *ngIf="msg.message">{{ getDecrypted(msg) }}</p>
                   <div class="bubble-meta">
                     <span class="bt">{{ msg.sentAt | date:'h:mm a' }}</span>
-                    <span class="status-ico" *ngIf="isMine(msg)" [title]="msg.status">
-                      {{ msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓' }}
+                    <span class="status-ico" *ngIf="isMine(msg)">
+                      <svg viewBox="0 0 16 10" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:10px;opacity:0.8">
+                        <ng-container *ngIf="msg.status === 'delivered' || msg.status === 'read'">
+                          <polyline points="1,5 4,8 9,1"/>
+                          <polyline points="6,5 9,8 14,1"/>
+                        </ng-container>
+                        <polyline *ngIf="msg.status === 'sent'" points="3,5 6,8 12,1"/>
+                      </svg>
                     </span>
                   </div>
                 </div>
@@ -248,7 +255,7 @@ const ROLE_COLOR: Record<string, string> = {
               <ng-template #spinner><div class="spin-sm"></div></ng-template>
             </button>
           </div>
-        </ng-container>
+        </div>
       </main>
 
       <!-- Lightbox -->
@@ -345,6 +352,10 @@ const ROLE_COLOR: Record<string, string> = {
     /* ── Chat Main ── */
     .chat-main {
       flex: 1; min-width: 0; display: flex; flex-direction: column; background: #f8fafc;
+    }
+    /* The pane that wraps header + messages + input when a user is selected */
+    .chat-pane {
+      flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
     }
 
     .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; text-align: center; padding: 40px; }
@@ -475,6 +486,10 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   readonly auth = inject(AuthService);
   readonly signalR = inject(SignalRService);
   private config = inject(ConfigService);
+  private crypto = inject(CryptoService);
+
+  /** Async decryption cache: msgKey → plaintext */
+  decryptedTexts = signal<Map<number | string, string>>(new Map());
 
   availableUsers = signal<any[]>([]);
   selectedUserId = signal<string | null>(null);
@@ -519,6 +534,25 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
       (String(m.fromUserId) === meId && String(m.toUserId) === String(selId))
     ).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   });
+
+  /**
+   * Returns decrypted text for a message.
+   * If it starts with ENC: it's patient↔doctor encrypted — decrypt it async.
+   * For all other messages (staff↔staff), they're plaintext.
+   */
+  getDecrypted(msg: ChatMessage): string {
+    if (!msg.message?.startsWith('ENC:')) return msg.message ?? '';
+    const key = msg.id ?? msg.sentAt.toString();
+    const cache = this.decryptedTexts();
+    if (cache.has(key)) return cache.get(key)!;
+    const myId = String(this.auth.currentUser()?.id);
+    // The other userId is whoever is NOT me
+    const otherId = String(msg.fromUserId) === myId ? String(msg.toUserId) : String(msg.fromUserId);
+    this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
+      this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, plain); return n; });
+    });
+    return '⋯ Decrypting...';
+  }
 
   constructor() {
     this.loadStaff();

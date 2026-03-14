@@ -23,17 +23,96 @@ namespace MediCore.API.Modules.Communication.Controllers
             _hubContext = hubContext;
         }
 
+        /// <summary>
+        /// Returns the list of users this user is allowed to chat with.
+        /// - Staff can chat with other staff (role-based).
+        /// - Patients can ONLY chat with their assigned doctors.
+        /// - Doctors see ALL staff + their assigned patients.
+        /// </summary>
         [HttpGet("users")]
         public async Task<IActionResult> GetChatUsers()
         {
             var userIdStr = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (!int.TryParse(userIdStr, out var currentUserId)) return Unauthorized();
 
-            // Fetch all active users who are staff (exclude patients or users without roles)
+            var currentRoles = User.Claims
+                .Where(c => c.Type == ClaimTypes.Role)
+                .Select(c => c.Value)
+                .ToList();
+
+            bool isPatient = currentRoles.Contains("Patient");
+
+            if (isPatient)
+            {
+                // Patients see ONLY their assigned doctors (via confirmed appointments)
+                var assignedDoctors = await _context.Appointments
+                    .Include(a => a.Doctor)
+                        .ThenInclude(d => d!.User)
+                    .Where(a => a.PatientUserId == currentUserId
+                             && a.Status == "Confirmed"
+                             && a.Doctor != null
+                             && a.Doctor.User != null)
+                    .Select(a => new
+                    {
+                        Id = a.Doctor!.UserId.ToString(),
+                        FullName = a.Doctor.User!.FullName,
+                        Role = "Doctor"
+                    })
+                    .Distinct()
+                    .ToListAsync();
+
+                return Ok(new { success = true, data = assignedDoctors });
+            }
+
+            bool isDoctor = currentRoles.Contains("Doctor");
+
+            if (isDoctor)
+            {
+                // Doctors see staff + their assigned patients
+                var staff = await _context.Users
+                    .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                    .Where(u => u.IsActive && u.Id != currentUserId
+                             && u.UserRoles.Any(ur => ur.Role.Name != "Patient"))
+                    .Select(u => new
+                    {
+                        Id = u.Id.ToString(),
+                        FullName = u.FullName,
+                        Role = u.UserRoles.Select(ur => ur.Role.Name).FirstOrDefault() ?? "Staff"
+                    })
+                    .ToListAsync();
+
+                // Get assigned patients
+                var doctorProfile = await _context.DoctorProfiles
+                    .FirstOrDefaultAsync(d => d.UserId == currentUserId);
+
+                if (doctorProfile != null)
+                {
+                    var patients = await _context.Appointments
+                        .Include(a => a.PatientUser)
+                        .Where(a => a.DoctorProfileId == doctorProfile.Id
+                                 && a.Status == "Confirmed"
+                                 && a.PatientUser != null)
+                        .Select(a => new
+                        {
+                            Id = a.PatientUserId.ToString(),
+                            FullName = a.PatientUser!.FullName,
+                            Role = "Patient"
+                        })
+                        .Distinct()
+                        .ToListAsync();
+
+                    var combined = staff.Concat(patients).DistinctBy(u => u.Id).ToList();
+                    return Ok(new { success = true, data = combined });
+                }
+
+                return Ok(new { success = true, data = staff });
+            }
+
+            // All other staff: see only other staff (no patients)
             var users = await _context.Users
-                .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-                .Where(u => u.IsActive && u.Id != currentUserId)
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .Where(u => u.IsActive && u.Id != currentUserId
+                         && u.UserRoles.Any(ur => ur.Role.Name != "Patient"))
                 .Select(u => new
                 {
                     Id = u.Id.ToString(),
@@ -51,29 +130,31 @@ namespace MediCore.API.Modules.Communication.Controllers
             var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (userId == null) return Unauthorized();
 
+            // Authorization guard: if current user is a Patient, verify the other user is their assigned doctor
+            if (User.IsInRole("Patient") && !string.IsNullOrEmpty(withUserId))
+            {
+                if (!int.TryParse(userId, out var patientId)) return Unauthorized();
+                var allowed = await _context.Appointments
+                    .Include(a => a.Doctor)
+                    .AnyAsync(a => a.PatientUserId == patientId
+                                && a.Status == "Confirmed"
+                                && a.Doctor != null
+                                && a.Doctor.UserId.ToString() == withUserId);
+                if (!allowed) return Forbid();
+            }
+
             var query = _context.ChatMessages.AsQueryable();
 
             if (!string.IsNullOrEmpty(groupName))
-            {
                 query = query.Where(m => m.GroupName == groupName);
-            }
             else if (!string.IsNullOrEmpty(withUserId))
-            {
-                query = query.Where(m => 
-                    (m.FromUserId == userId && m.ToUserId == withUserId) || 
+                query = query.Where(m =>
+                    (m.FromUserId == userId && m.ToUserId == withUserId) ||
                     (m.FromUserId == withUserId && m.ToUserId == userId));
-            }
             else
-            {
-                // General inbox logic?
                 query = query.Where(m => m.FromUserId == userId || m.ToUserId == userId);
-            }
 
-            var messages = await query
-                .OrderByDescending(m => m.SentAt)
-                .Take(50)
-                .ToListAsync();
-
+            var messages = await query.OrderByDescending(m => m.SentAt).Take(50).ToListAsync();
             return Ok(new { success = true, data = messages.OrderBy(m => m.SentAt) });
         }
 
@@ -83,12 +164,26 @@ namespace MediCore.API.Modules.Communication.Controllers
             var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (userId == null) return Unauthorized();
 
+            // Patient access guard
+            if (User.IsInRole("Patient") && !string.IsNullOrEmpty(dto.ToUserId))
+            {
+                if (!int.TryParse(userId, out var patientId)) return Unauthorized();
+                var allowed = await _context.Appointments
+                    .Include(a => a.Doctor)
+                    .AnyAsync(a => a.PatientUserId == patientId
+                                && a.Status == "Confirmed"
+                                && a.Doctor != null
+                                && a.Doctor.UserId.ToString() == dto.ToUserId);
+                if (!allowed) return Forbid();
+            }
+
+            // Message is stored as received (already encrypted by client)
             var message = new ChatMessage
             {
                 FromUserId = userId,
                 ToUserId = dto.ToUserId ?? string.Empty,
                 GroupName = dto.GroupName,
-                Message = dto.Message,
+                Message = dto.Message,   // cipher text stored
                 ImageUrl = dto.ImageUrl,
                 SentAt = DateTime.UtcNow
             };
@@ -105,8 +200,6 @@ namespace MediCore.API.Modules.Communication.Controllers
             {
                 await _hubContext.Clients.Group($"user-{dto.ToUserId}")
                     .SendAsync("ReceiveChatMessage", userId, dto.Message, dto.ImageUrl);
-                
-                // Also notify sender if they have multiple connections
                 await _hubContext.Clients.Group($"user-{userId}")
                     .SendAsync("ReceiveChatMessage", userId, dto.Message, dto.ImageUrl);
             }

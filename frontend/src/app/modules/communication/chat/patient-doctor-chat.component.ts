@@ -5,13 +5,25 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { SignalRService, ChatMessage } from '../../../core/services/signalr.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { CryptoService } from '../../../core/services/crypto.service';
+import { CallOverlayComponent } from './call-overlay.component';
 
 @Component({
   selector: 'app-patient-doctor-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CallOverlayComponent],
   template: `
     <div class="chat-wrapper" [class.mini]="isMini">
+      <!-- Active Call Overlay -->
+      <app-call-overlay
+        *ngIf="showCall()"
+        [callerName]="otherUserName"
+        [callType]="callType()"
+        [callerId]="otherUserId"
+        [isInitiator]="callInitiator()"
+        (callEnded)="showCall.set(false)">
+      </app-call-overlay>
+
       <div class="chat-header">
         <div class="user-info">
           <div class="avatar">{{ otherUserName[0] | uppercase }}</div>
@@ -20,7 +32,19 @@ import { ConfigService } from '../../../core/services/config.service';
             <span class="status">● Online</span>
           </div>
         </div>
-        <button class="close-btn" (click)="close.emit()" title="Close chat">✕</button>
+        <div class="header-actions">
+          <!-- Audio call -->
+          <button class="call-btn audio" (click)="startCall('audio')" title="Audio Call">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+          </button>
+          <!-- Video call -->
+          <button class="call-btn video" (click)="startCall('video')" title="Video Call">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+          </button>
+          <!-- 🔒 Encrypted badge -->
+          <span class="enc-badge" title="Messages are end-to-end encrypted">🔒 E2E</span>
+          <button class="close-btn" (click)="close.emit()" title="Close">✕</button>
+        </div>
       </div>
 
       <div class="messages-area" #scrollMe>
@@ -145,6 +169,16 @@ import { ConfigService } from '../../../core/services/config.service';
 
     .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: zoom-out; }
     .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 12px; object-fit: contain; }
+
+    /* Call buttons & security badge */
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .call-btn { width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+    .call-btn.audio { background: #dcfce7; color: #16a34a; }
+    .call-btn.audio:hover { background: #16a34a; color: #fff; transform: scale(1.08); }
+    .call-btn.video { background: #eff6ff; color: #2563eb; }
+    .call-btn.video:hover { background: #2563eb; color: #fff; transform: scale(1.08); }
+    .call-btn svg { width: 18px; height: 18px; }
+    .enc-badge { font-size: 11px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
   `]
 })
 export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
@@ -165,6 +199,11 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
   previewUrl: string | null = null;
   lightboxUrl: string | null = null;
   isUploading = signal(false);
+  showCall = signal(false);
+  callType = signal<'video' | 'audio'>('video');
+  callInitiator = signal(false);
+
+  private crypto = inject(CryptoService);
 
   activeMessages = computed(() => {
     const targetId = this.otherUserId;
@@ -179,6 +218,14 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
 
   constructor() {
     effect(() => { this.activeMessages(); this.scrollToBottom(); });
+    // Listen for incoming calls from this specific user
+    this.signalR.onWebRtcEvent('IncomingCall', (from: string, type: string) => {
+      if (String(from) === String(this.otherUserId)) {
+        this.callType.set(type as 'video' | 'audio');
+        this.callInitiator.set(false);
+        this.showCall.set(true);
+      }
+    });
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -203,6 +250,13 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
     });
   }
 
+  startCall(type: 'video' | 'audio') {
+    this.callType.set(type);
+    this.callInitiator.set(true);
+    this.showCall.set(true);
+    this.signalR.sendCallRequest(this.otherUserId, type);
+  }
+
   async sendMessage() {
     if ((!this.newMessage.trim() && !this.selectedFile) || !this.otherUserId) return;
 
@@ -214,14 +268,17 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
     }
 
     const msg = this.newMessage;
+    const myId = String(this.auth.currentUser()?.id);
+    // Encrypt before sending — server only sees ciphertext
+    const encrypted = await this.crypto.encrypt(msg, myId, String(this.otherUserId));
     this.isUploading.set(true);
     try {
-      await this.signalR.sendChatMessage(this.otherUserId, msg, imageUrl);
+      await this.signalR.sendChatMessage(this.otherUserId, encrypted, imageUrl);
 
-      // Optimistic update
+      // Show plaintext in local UI (optimistic)
       this.signalR.chatMessages.update(msgs => [...msgs, {
         id: Date.now(),
-        fromUserId: String(this.auth.currentUser()?.id),
+        fromUserId: myId,
         toUserId: String(this.otherUserId),
         message: msg,
         imageUrl,

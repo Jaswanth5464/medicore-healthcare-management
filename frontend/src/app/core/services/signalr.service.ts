@@ -20,6 +20,7 @@ export interface ChatMessage {
   message: string;
   imageUrl?: string;
   sentAt: Date;
+  status?: 'sent' | 'delivered' | 'read';
 }
 
 @Injectable({
@@ -33,6 +34,10 @@ export class SignalRService {
   unreadCount = signal(0);
   chatMessages = signal<ChatMessage[]>([]);
   activeChatPartner = signal<string | null>(null);
+  // DND & presence
+  isDndActive = signal<boolean>(false);
+  onlineUserIds = signal<Set<string>>(new Set());
+  typingUserId = signal<string | null>(null);
   
   constructor(
     private authService: AuthService,
@@ -160,14 +165,31 @@ export class SignalRService {
 
     // Listen for Chat Messages
     this.hubConnection.on('ReceiveChatMessage', (fromUserId: string, message: string, imageUrl?: string) => {
+      // Ignore messages if DND is active
+      if (this.isDndActive()) return;
       const currentUserId = this.authService.currentUser()?.id;
       this.addChatMessage({
         fromUserId: String(fromUserId),
         toUserId: String(currentUserId),
         message,
         imageUrl,
-        sentAt: new Date()
+        sentAt: new Date(),
+        status: 'delivered'
       });
+    });
+
+    // Typing indicator
+    this.hubConnection.on('UserTyping', (fromUserId: string) => {
+      this.typingUserId.set(fromUserId);
+      setTimeout(() => this.typingUserId.set(null), 3000);
+    });
+
+    // Online/offline presence
+    this.hubConnection.on('UserOnline', (userId: string) => {
+      this.onlineUserIds.update(s => { const n = new Set(s); n.add(userId); return n; });
+    });
+    this.hubConnection.on('UserOffline', (userId: string) => {
+      this.onlineUserIds.update(s => { const n = new Set(s); n.delete(userId); return n; });
     });
 
     this.hubConnection.on('ReceiveGroupMessage', (groupName: string, fromUserId: string, message: string) => {
@@ -227,10 +249,77 @@ export class SignalRService {
     }
   }
 
+  async sendTypingIndicator(toUserId: string) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      try { await this.hubConnection.invoke('SendTypingIndicator', toUserId); } catch {}
+    }
+  }
+
   async sendGroupMessage(groupName: string, message: string) {
     if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
       await this.hubConnection.invoke('SendGroupMessage', groupName, message);
     }
+  }
+
+  toggleDnd() {
+    this.isDndActive.update(v => !v);
+  }
+
+  isUserOnline(userId: string): boolean {
+    return this.onlineUserIds().has(String(userId));
+  }
+
+  // ── WebRTC Signaling ──────────────────────────────────────────────
+  incomingCall = signal<{ from: string; callType: string } | null>(null);
+
+  private webRtcHandlers = new Map<string, Function[]>();
+
+  onWebRtcEvent(event: string, handler: (...args: any[]) => void) {
+    if (!this.webRtcHandlers.has(event)) this.webRtcHandlers.set(event, []);
+    this.webRtcHandlers.get(event)!.push(handler);
+    // If hub already connected, register now
+    if (this.hubConnection) this.hubConnection.on(event, handler as any);
+  }
+
+  private registerWebRtcEvents() {
+    // Re-register persisted handlers after reconnect
+    this.webRtcHandlers.forEach((handlers, event) => {
+      handlers.forEach(h => this.hubConnection?.on(event, h as any));
+    });
+    // Incoming call signal
+    this.hubConnection?.on('IncomingCall', (fromUserId: string, callType: string) => {
+      if (!this.isDndActive()) this.incomingCall.set({ from: fromUserId, callType });
+    });
+  }
+
+  async sendCallRequest(toUserId: string, callType: 'video' | 'audio') {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected)
+      await this.hubConnection.invoke('SendCallRequest', toUserId, callType);
+  }
+
+  async sendCallResponse(toUserId: string, accepted: boolean) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected)
+      await this.hubConnection.invoke('SendCallResponse', toUserId, accepted);
+  }
+
+  async sendOffer(toUserId: string, offer: string) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected)
+      await this.hubConnection.invoke('SendOffer', toUserId, offer);
+  }
+
+  async sendAnswer(toUserId: string, answer: string) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected)
+      await this.hubConnection.invoke('SendAnswer', toUserId, answer);
+  }
+
+  async sendIceCandidate(toUserId: string, candidate: string) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected)
+      await this.hubConnection.invoke('SendIceCandidate', toUserId, candidate);
+  }
+
+  async endCall(toUserId: string) {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected)
+      await this.hubConnection.invoke('EndCall', toUserId);
   }
 
   private addChatMessage(msg: ChatMessage) {

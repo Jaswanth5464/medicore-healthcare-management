@@ -321,7 +321,7 @@ namespace MediCore.API.Modules.OPD.Controllers
                     DoctorProfileId = appointment.DoctorProfileId,
                     BillSource = "OPD",
                     SourceReferenceId = appointment.Id,
-                    Items = System.Text.Json.Serializer.Serialize(items),
+                    Items = System.Text.Json.JsonSerializer.Serialize(items),
                     SubTotal = total,
                     TotalAmount = total,
                     Status = "Unpaid",

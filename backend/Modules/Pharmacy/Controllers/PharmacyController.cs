@@ -41,7 +41,7 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             var existing = await _context.Medicines.FindAsync(id);
             if (existing == null) return NotFound(new { success = false, message = "Medicine not found" });
 
-            existing.MedicineName = medicine.MedicineName;
+            existing.Name = medicine.Name;
             existing.GenericName = medicine.GenericName;
             existing.Category = medicine.Category;
             existing.Manufacturer = medicine.Manufacturer;
@@ -178,11 +178,11 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 if (med == null) continue;
 
                 if (med.StockQuantity < item.Count)
-                    return BadRequest(new { success = false, message = $"Insufficient stock for {med.MedicineName}" });
+                    return BadRequest(new { success = false, message = $"Insufficient stock for {med.Name}" });
 
                 med.StockQuantity -= item.Count;
                 totalBill += med.Price * item.Count;
-                itemsSummary.Add(new { name = med.MedicineName, count = item.Count, price = med.Price });
+                itemsSummary.Add(new { name = med.Name, count = item.Count, price = med.Price });
             }
 
             // Create Bill for Walk-in

@@ -141,10 +141,10 @@ var app = builder.Build();
 // NUCLEAR CORS FIX: AT THE ABSOLUTE TOP TO CATCH PREFLIGHT OPTIONS
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.Add("Access-Control-Allow-Origin", context.Request.Headers["Origin"]);
-    context.Response.Headers.Add("Access-Control-Allow-Headers", "*");
-    context.Response.Headers.Add("Access-Control-Allow-Methods", "*");
-    context.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
+    context.Response.Headers.Append("Access-Control-Allow-Origin", context.Request.Headers["Origin"]);
+    context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
+    context.Response.Headers.Append("Access-Control-Allow-Methods", "*");
+    context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");
 
     if (context.Request.Method == "OPTIONS")
     {

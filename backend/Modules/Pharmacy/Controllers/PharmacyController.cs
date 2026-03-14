@@ -34,7 +34,44 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             return Ok(new { success = true, data = medicines });
         }
 
-        // PUT api/pharmacy/inventory/{id}
+        // POST api/pharmacy/inventory  (Add new medicine)
+        [HttpPost("inventory")]
+        public async Task<IActionResult> AddMedicine([FromBody] Medicine medicine)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid medicine data" });
+
+            if (string.IsNullOrWhiteSpace(medicine.Name))
+                return BadRequest(new { success = false, message = "Medicine name is required" });
+
+            // Check for duplicate
+            var exists = await _context.Medicines.AnyAsync(m => m.Name == medicine.Name);
+            if (exists)
+                return Conflict(new { success = false, message = "A medicine with this name already exists" });
+
+            var newMed = new Medicine
+            {
+                Name = medicine.Name.Trim(),
+                GenericName = medicine.GenericName?.Trim() ?? string.Empty,
+                Category = medicine.Category?.Trim() ?? "Tablet",
+                Manufacturer = medicine.Manufacturer?.Trim() ?? string.Empty,
+                Price = medicine.Price,
+                StockQuantity = medicine.StockQuantity,
+                LowStockThreshold = medicine.LowStockThreshold > 0 ? medicine.LowStockThreshold : 50,
+                ExpiryDate = medicine.ExpiryDate,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Medicines.Add(newMed);
+            await _context.SaveChangesAsync();
+
+            // Notify pharmacists of new stock item
+            await _hubContext.Clients.Group(MediCore.API.Hubs.MediCoreHub.PharmacistGroup)
+                .SendAsync("InventoryUpdated", new { action = "added", medicine = newMed.Name });
+
+            return Ok(new { success = true, message = "Medicine added successfully", data = newMed });
+        }
+
         [HttpPut("inventory/{id}")]
         public async Task<IActionResult> UpdateMedicine(int id, [FromBody] Medicine medicine)
         {

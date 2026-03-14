@@ -38,9 +38,9 @@ export class PharmacistDashboardComponent implements OnInit {
   editingMedicineId = signal<number | null>(null);
   
   newMedicine = {
-    medicineName: '',
+    name: '',
     genericName: '',
-    category: '',
+    category: 'Tablet',
     manufacturer: '',
     price: 0,
     stockQuantity: 0,
@@ -92,7 +92,7 @@ export class PharmacistDashboardComponent implements OnInit {
     const q = this.counterSearch().toLowerCase();
     this.filteredInventory.set(
       this.inventoryData().filter(m => 
-        m.medicineName.toLowerCase().includes(q) || 
+        m.name?.toLowerCase().includes(q) || 
         m.genericName?.toLowerCase().includes(q)
       )
     );
@@ -154,7 +154,7 @@ export class PharmacistDashboardComponent implements OnInit {
   }
 
   addMedicine() {
-    if (!this.newMedicine.medicineName || !this.newMedicine.category || this.newMedicine.price <= 0) {
+    if (!this.newMedicine.name || !this.newMedicine.category || this.newMedicine.price <= 0) {
       this.ns.error('Please fill all required fields');
       return;
     }
@@ -207,7 +207,7 @@ export class PharmacistDashboardComponent implements OnInit {
     this.loadInventory();
     // Reset form
     this.newMedicine = {
-      medicineName: '',
+      name: '',
       genericName: '',
       category: '',
       manufacturer: '',

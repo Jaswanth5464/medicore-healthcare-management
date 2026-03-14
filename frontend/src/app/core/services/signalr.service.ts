@@ -256,9 +256,31 @@ export class SignalRService {
   }
 
   // Chat Methods
-  async sendChatMessage(toUserId: string, message: string, imageUrl?: string) {
+  async sendChatMessage(toUserId: string, message: string, imageUrl?: string): Promise<boolean> {
+    // Try SignalR first (real-time)
     if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
-      await this.hubConnection.invoke('SendChatMessage', toUserId, message, imageUrl);
+      try {
+        await this.hubConnection.invoke('SendChatMessage', toUserId, message, imageUrl ?? null);
+        return true;
+      } catch (e) {
+        console.warn('SignalR send failed, falling back to HTTP', e);
+      }
+    }
+    // Fallback: HTTP POST
+    try {
+      const token = this.authService.getAccessToken();
+      await fetch(`${this.configService.baseApiUrl}/api/chat/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ toUserId, message, imageUrl })
+      });
+      return true;
+    } catch (e) {
+      console.error('HTTP send also failed', e);
+      return false;
     }
   }
 

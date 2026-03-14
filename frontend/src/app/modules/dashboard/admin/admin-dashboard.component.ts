@@ -634,48 +634,76 @@ interface UserListResponse {
             <span class="stat-value">{{ systemStats()?.totalAppointments || 0 }}</span>
           </div>
         </div>
-      </div>       <!-- Financial Reports -->
-       <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px;">
-         <!-- Dept Revenue Bar Chart -->
-         <div style="background:#fafbfc; border:1px solid #e2e8f0; border-radius:12px; padding:20px;">
-           <h3 style="font-size:15px; color:#0f172a; margin-bottom:16px;">Revenue by Department</h3>
-           <div style="display:flex; flex-direction:column; gap:12px;">
-              <div *ngIf="!reportData()?.revenueByDept || reportData()?.revenueByDept.length === 0" style="color:#64748b; font-size:13px;">No department revenue data.</div>
-              <div *ngFor="let item of reportData()?.revenueByDept" style="display:flex; align-items:center; gap:12px;">
-                  <div style="width:100px; font-size:12px; font-weight:600; color:#475569;">{{ item.department || 'General' }}</div>
-                  <div style="flex:1; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                     <div style="height:100%; background:#3b82f6; border-radius:4px;" [style.width]="(item.amount / reportData()?.totalRevenue * 100) + '%'"></div>
-                  </div>
-                  <div style="font-size:12px; font-weight:700; color:#0f172a;">₹{{ item.amount }}</div>
-              </div>
-           </div>
-         </div>
+      </div>       <!-- Premium Revenue Dashboard -->
+      <!-- Source Cards Row -->
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px;">
+        <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden;">
+          <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;opacity:0.75;margin-bottom:8px;">OPD CONSULTATIONS</div>
+          <div style="font-size:28px;font-weight:800;">&#8377;{{ getSourceRevenue('OPD') | number:'1.0-0' }}</div>
+          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Appointment Fees</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#10b981,#047857); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden;">
+          <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;opacity:0.75;margin-bottom:8px;">PHARMACY SALES</div>
+          <div style="font-size:28px;font-weight:800;">&#8377;{{ getSourceRevenue('Pharmacy') | number:'1.0-0' }}</div>
+          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Medicines &amp; Prescriptions</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden;">
+          <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;opacity:0.75;margin-bottom:8px;">LABORATORY</div>
+          <div style="font-size:28px;font-weight:800;">&#8377;{{ getSourceRevenue('Laboratory') | number:'1.0-0' }}</div>
+          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Tests &amp; Diagnostics</div>
+        </div>
+      </div>
+      <!-- Total Banner -->
+      <div style="background:linear-gradient(135deg,#0f172a,#0f4c81); border-radius:16px; padding:28px 32px; color:#fff; display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; box-shadow:0 20px 40px rgba(15,76,129,0.3);">
+        <div>
+          <div style="font-size:11px;opacity:0.65;font-weight:600;letter-spacing:1.5px;margin-bottom:6px;">TOTAL HOSPITAL REVENUE (30 DAYS)</div>
+          <div style="font-size:42px;font-weight:800;letter-spacing:-1px;">&#8377;{{ reportData()?.totalRevenue?.toLocaleString() || '0' }}</div>
+          <div style="margin-top:8px;font-size:12px;opacity:0.6;">Aggregated from OPD, Pharmacy &amp; Lab — Paid Bills Only</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;opacity:0.6;margin-bottom:10px;letter-spacing:1px;">BREAKDOWN</div>
+          <div *ngFor="let src of reportData()?.revenueBySource" style="font-size:13px;display:flex;justify-content:space-between;gap:32px;margin-bottom:6px;">
+            <span style="opacity:0.8;">{{ src.source }}</span>
+            <span style="font-weight:700;">{{ reportData()?.totalRevenue > 0 ? ((src.amount / reportData()?.totalRevenue) * 100 | number:'1.0-0') : 0 }}%</span>
+          </div>
+        </div>
+      </div>
+      <!-- Department Bars -->
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:24px; margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#0f172a;">Revenue by Department</div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">Contributions per clinical unit</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:#0f4c81;background:#eff6ff;padding:6px 14px;border-radius:8px;">Total: &#8377;{{ reportData()?.totalRevenue?.toLocaleString() || 0 }}</div>
+        </div>
+        <div *ngIf="!reportData()?.revenueByDept?.length" style="text-align:center;padding:32px;color:#94a3b8;font-size:13px;">No department revenue data yet.</div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div *ngFor="let item of reportData()?.revenueByDept; let i = index" style="display:flex;align-items:center;gap:14px;">
+            <div style="width:130px;font-size:13px;font-weight:600;color:#334155;flex-shrink:0;">{{ item.department || 'General' }}</div>
+            <div style="flex:1;height:10px;background:#f1f5f9;border-radius:99px;overflow:hidden;">
+              <div [style.width]="(reportData()?.totalRevenue > 0 ? (item.amount / reportData()?.totalRevenue * 100) : 0) + '%'"
+                   [style.background]="i === 0 ? '#3b82f6' : i === 1 ? '#10b981' : i === 2 ? '#8b5cf6' : i === 3 ? '#f59e0b' : '#ef4444'"
+                   style="height:100%;border-radius:99px;"></div>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#0f172a;width:80px;text-align:right;">&#8377;{{ item.amount | number:'1.0-0' }}</div>
+            <div style="font-size:11px;color:#64748b;width:40px;text-align:right;">{{ reportData()?.totalRevenue > 0 ? (item.amount / reportData()?.totalRevenue * 100 | number:'1.0-0') : 0 }}%</div>
+          </div>
+        </div>
+      </div>
 
-         <!-- Source Revenue Pie/Multi-bar Chart -->
-         <div style="background:#fafbfc; border:1px solid #e2e8f0; border-radius:12px; padding:20px;">
-           <h3 style="font-size:15px; color:#0f172a; margin-bottom:16px;">Revenue by Source</h3>
-           <div style="display:flex; flex-direction:column; gap:12px;">
-              <div *ngIf="!reportData()?.revenueBySource || reportData()?.revenueBySource.length === 0" style="color:#64748b; font-size:13px;">No source revenue data.</div>
-              <div *ngFor="let item of reportData()?.revenueBySource" style="display:flex; align-items:center; gap:12px;">
-                  <div style="width:100px; font-size:12px; font-weight:600; color:#475569;">{{ item.source }}</div>
-                  <div style="flex:1; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                     <div style="height:100%; background:#8b5cf6; border-radius:4px;" [style.width]="(item.amount / reportData()?.totalRevenue * 100) + '%'"></div>
-                  </div>
-                  <div style="font-size:12px; font-weight:700; color:#0f172a;">₹{{ item.amount }}</div>
-              </div>
-           </div>
-         </div>
-       </div>
 
-       <!-- Total Summary Card -->
-       <div style="background:linear-gradient(135deg, #0f4c81, #0a2744); border-radius:12px; padding:24px; color:white; display:flex; flex-direction:column; justify-content:center; margin-bottom: 24px;">
-           <span style="font-size:14px; opacity:0.8; margin-bottom:8px;">Total Hospital Revenue (All Sources)</span>
-           <span style="font-size:36px; font-weight:700;">₹{{ reportData()?.totalRevenue?.toLocaleString() || 0 }}</span>
-           <div style="margin-top:16px; font-size:13px; opacity:0.9; display:flex; align-items:center; gap:6px;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-              Calculated from Appointments, Pharmacy & Lab
-           </div>
-       </div>
+
+
+
+
+
+
+
+
         
       <!-- Audit Logs Section -->
       <div style="margin-top:40px;">
@@ -1810,6 +1838,13 @@ export class AdminDashboardComponent implements OnInit {
         },
         error: () => {}
       });
+  }
+
+  getSourceRevenue(source: string): number {
+    const data = this.reportData();
+    if (!data || !data.revenueBySource) return 0;
+    const sourceData = data.revenueBySource.find((s: any) => s.source === source);
+    return sourceData ? sourceData.amount : 0;
   }
 
   filterByRole(role: string): void {

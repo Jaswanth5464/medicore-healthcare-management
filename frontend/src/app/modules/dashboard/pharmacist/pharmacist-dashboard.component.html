@@ -100,7 +100,7 @@
           <div class="med-selector-grid">
             <div class="med-selection-card" *ngFor="let med of filteredInventory()" (click)="addToBasket(med)">
               <div class="msc-top">
-                <span class="msc-name">{{ med.medicineName }}</span>
+                <span class="msc-name">{{ med.name }}</span>
                 <span class="msc-price">₹{{ med.price }}</span>
               </div>
               <div class="msc-bottom">
@@ -123,7 +123,7 @@
           <div class="basket-items">
             <div class="basket-item" *ngFor="let item of walkInBasket(); let i = index">
               <div class="bi-info">
-                <span class="bi-name">{{ item.medicineName }}</span>
+                <span class="bi-name">{{ item.name }}</span>
                 <span class="bi-sub">₹{{ item.price }} / unit</span>
               </div>
               <div class="bi-controls">
@@ -182,7 +182,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Medicine Name *</label>
-            <input type="text" [(ngModel)]="newMedicine.medicineName" placeholder="e.g. Paracetamol 500mg">
+            <input type="text" [(ngModel)]="newMedicine.name" placeholder="e.g. Paracetamol 500mg">
           </div>
           <div class="form-group">
             <label>Generic Name</label>
@@ -246,7 +246,7 @@
             </tr>
             <tr *ngFor="let med of inventoryData()">
               <td>
-                <strong>{{ med.medicineName }}</strong>
+                <strong>{{ med.name }}</strong>
                 <div class="text-xs text-gray-500">{{ med.genericName }}</div>
               </td>
               <td>{{ med.category }}</td>

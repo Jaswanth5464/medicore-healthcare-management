@@ -266,13 +266,12 @@ const ROLE_COLOR: Record<string, string> = {
   `,
   styles: [`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    :host { display: flex; height: 100%; font-family: 'Inter', sans-serif; }
+    :host { display: block; height: 100%; width: 100%; overflow: hidden; }
 
     /* ── Root ── */
     .hub-root {
-      display: flex; width: 100%; height: calc(100vh - 140px); min-height: 600px;
-      border-radius: 14px; overflow: hidden;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; background: #fff;
+      display: flex; height: 100%; width: 100%; background: #fff; overflow: hidden;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
     .hub-root.dnd-active { border: 2px solid #f59e0b; }
 
@@ -351,18 +350,19 @@ const ROLE_COLOR: Record<string, string> = {
 
     /* ── Chat Main ── */
     .chat-main {
-      flex: 1; min-width: 0; display: flex; flex-direction: column; background: #f8fafc;
+      flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff;
+      height: 100%; max-height: 100%; overflow: hidden;
     }
     /* The pane that wraps header + messages + input when a user is selected */
     .chat-pane {
-      flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+      flex: 1; display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;
     }
 
     .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; text-align: center; padding: 40px; }
     .ph-icon { width: 80px; height: 80px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     .ph-icon svg { width: 40px; height: 40px; stroke: #2563eb; }
-    .placeholder h2 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0; }
-    .placeholder p { font-size: 14px; color: #64748b; margin: 0; max-width: 360px; }
+    .placeholder h2 { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .placeholder p { font-size: 15px; color: #64748b; margin: 0; max-width: 400px; line-height: 1.6; }
     .feature-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
     .feature-pills span { display: flex; align-items: center; gap: 5px; background: #fff; color: #1e293b; border: 1px solid #e2e8f0; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     .feature-pills span svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -442,8 +442,9 @@ const ROLE_COLOR: Record<string, string> = {
 
     /* Input bar */
     .input-bar {
-      padding: 14px 20px; background: #fff; border-top: 1px solid #e2e8f0;
-      display: flex; gap: 10px; align-items: center; flex-shrink: 0; z-index: 5;
+      padding: 16px 20px; background: #fff; border-top: 1px solid #f1f5f9;
+      display: flex; gap: 12px; align-items: center; flex-shrink: 0;
+      box-shadow: 0 -4px 10px rgba(0,0,0,0.02);
     }
     .msg-input {
       flex: 1; padding: 12px 18px; border: 1.5px solid #e2e8f0; border-radius: 24px;

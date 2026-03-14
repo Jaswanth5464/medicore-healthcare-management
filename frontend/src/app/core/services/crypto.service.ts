@@ -24,6 +24,10 @@ export class CryptoService {
     if (this.keyCache.has(cacheKey)) return this.keyCache.get(cacheKey)!;
 
     const enc = new TextEncoder();
+    if (!crypto.subtle) {
+      throw new Error('Web Crypto API (subtle) is not available. Secure context (HTTPS/localhost) required.');
+    }
+
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
       enc.encode(`${a}:${b}`),
@@ -59,13 +63,18 @@ export class CryptoService {
   async encrypt(plaintext: string, myUserId: string, otherUserId: string): Promise<string> {
     if (!myUserId || !otherUserId) return plaintext;
 
+    if (!crypto.subtle) {
+      console.warn('CryptoService: Web Crypto API (subtle) is unavailable. Falling back to plaintext. Ensure you are using HTTPS or localhost.');
+      return plaintext;
+    }
+
     const key = await this.getKey(myUserId, otherUserId);
     const ivRaw = crypto.getRandomValues(new Uint8Array(12));
     const enc = new TextEncoder();
     const cipherBuf = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv: ivRaw as any },
+      { name: 'AES-GCM', iv: ivRaw },
       key,
-      enc.encode(plaintext) as any
+      enc.encode(plaintext)
     );
 
     const ivB64 = this.toBase64(ivRaw);
@@ -81,6 +90,11 @@ export class CryptoService {
   async decrypt(payload: string, myUserId: string, otherUserId: string): Promise<string> {
     if (!payload.startsWith('ENC:')) return payload;
     if (!myUserId || !otherUserId) return '[encrypted]';
+
+    if (!crypto.subtle) {
+      console.error('CryptoService: Cannot decrypt message because Web Crypto API is unavailable (insecure context).');
+      return '[encrypted message — secure context required]';
+    }
 
     const key = await this.getKey(myUserId, otherUserId);
     const [ivB64, ctB64] = payload.slice(4).split('.');

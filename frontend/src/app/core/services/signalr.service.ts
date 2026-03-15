@@ -292,14 +292,6 @@ export class SignalRService {
   }
 
   async sendChatMessage(toUserId: string, message: string, imageUrl?: string): Promise<boolean> {
-    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
-      try {
-        await this.hubConnection.invoke('SendChatMessage', toUserId, message, imageUrl ?? null);
-        return true;
-      } catch (e) {
-        console.warn('SignalR send failed, falling back to HTTP', e);
-      }
-    }
     try {
       const token = this.authService.getAccessToken();
       const res = await fetch(`${this.configService.baseApiUrl}/api/chat/send`, {
@@ -308,8 +300,13 @@ export class SignalRService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ toUserId: String(toUserId), message: message ?? '', imageUrl: imageUrl ?? null })
+        body: JSON.stringify({ 
+          toUserId: String(toUserId), 
+          message: message ?? '', 
+          imageUrl: imageUrl ?? null 
+        })
       });
+
       if (!res.ok) {
         const errText = await res.text();
         console.error('HTTP chat/send failed', res.status, errText);
@@ -317,7 +314,7 @@ export class SignalRService {
       }
       return true;
     } catch (e) {
-      console.error('HTTP send also failed', e);
+      console.error('HTTP send failed', e);
       throw e;
     }
   }
@@ -325,29 +322,31 @@ export class SignalRService {
   /** Dedicated patient-doctor chat: uses /api/chat/patient-doctor/send (no appointment required) */
   async sendPatientDoctorMessage(toUserId: string, message: string, imageUrl?: string): Promise<boolean> {
     const toId = String(toUserId);
-    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
-      try {
-        await this.hubConnection.invoke('SendChatMessage', toId, message, imageUrl ?? null);
-        return true;
-      } catch (e) {
-        console.warn('SignalR send failed, falling back to patient-doctor API', e);
+    try {
+      const token = this.authService.getAccessToken();
+      const res = await fetch(`${this.configService.baseApiUrl}/api/chat/patient-doctor/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          toUserId: toId, 
+          message: message ?? '', 
+          imageUrl: imageUrl ?? null 
+        })
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('Patient-doctor send failed', res.status, errText);
+        throw new Error(`Send failed: ${res.status}`);
       }
+      return true;
+    } catch (e) {
+      console.error('Patient-doctor HTTP send failed', e);
+      throw e;
     }
-    const token = this.authService.getAccessToken();
-    const res = await fetch(`${this.configService.baseApiUrl}/api/chat/patient-doctor/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ toUserId: toId, message: message ?? '', imageUrl: imageUrl ?? null })
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Patient-doctor send failed', res.status, errText);
-      throw new Error(`Send failed: ${res.status}`);
-    }
-    return true;
   }
 
   async sendTypingIndicator(toUserId: string) {

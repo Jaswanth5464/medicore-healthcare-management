@@ -516,20 +516,33 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
    * not on every Angular change-detection cycle.
    */
   getDecrypted(msg: ChatMessage): string {
-    if (!msg.message?.startsWith('ENC:')) return msg.message ?? '';
     const key = msg.id ?? msg.sentAt.toString();
     const cache = this.decryptedTexts();
     if (cache.has(key)) return cache.get(key)!;
+    
+    // If it's already plaintext (e.g. just sent by us), return it
+    if (!msg.message?.startsWith('ENC:')) return msg.message ?? '';
+
     if (!this.decryptionPending.has(key)) {
       this.decryptionPending.add(key);
       const myId = String(this.auth.currentUser()?.id);
       const otherId = String(msg.fromUserId) === myId ? String(msg.toUserId) : String(msg.fromUserId);
+      
       this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
         this.decryptionPending.delete(key);
-        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, plain); return n; });
-      }).catch(() => {
+        this.decryptedTexts.update(m => { 
+          const n = new Map(m); 
+          n.set(key, plain); 
+          return n; 
+        });
+      }).catch(err => {
+        console.warn('Decryption failed for hospital message', key, err);
         this.decryptionPending.delete(key);
-        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, '[decryption error]'); return n; });
+        this.decryptedTexts.update(m => { 
+          const n = new Map(m); 
+          n.set(key, '[Decryption error]'); 
+          return n; 
+        });
       });
     }
     return '⋯ Decrypting...';
@@ -579,12 +592,21 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   loadHistory(toUserId: string) {
     this.http.get<any>(`${this.config.baseApiUrl}/api/chat/recent?withUserId=${toUserId}`, {
       headers: { Authorization: `Bearer ${this.auth.getAccessToken()}` }
-    }).subscribe(r => {
-      if (r.success && r.data?.length) {
-        const existing = this.signalR.chatMessages();
-        const existingIds = new Set(existing.map((e: any) => e.id).filter(Boolean));
-        const fresh = r.data.filter((m: any) => !m.id || !existingIds.has(m.id));
-        this.signalR.chatMessages.set([...existing, ...fresh]);
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          const incoming = res.data as ChatMessage[];
+          this.signalR.chatMessages.update(existing => {
+            const existingIds = new Set(existing.map(e => e.id).filter(id => id !== undefined));
+            const fresh = incoming.filter(m => m.id && !existingIds.has(m.id));
+            return [...existing, ...fresh].sort((a, b) => 
+                new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
+            );
+          });
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load history', err);
       }
     });
   }

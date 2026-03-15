@@ -291,22 +291,40 @@ namespace MediCore.API.Modules.OPD.Controllers
                 var fee = appointment.ConsultationFee > 0 ? appointment.ConsultationFee : 500;
                 
                 items.Add(new { description = "Consultation Fee", amount = fee });
-                var total = fee;
+                decimal total = fee;
 
-                // Add Lab Tests to Bill (assume flat 800 per test for demo purposes if not specified)
+                // Add Lab Tests to Bill with ACTUAL prices
                 foreach(var lab in labOrders)
                 {
-                    decimal labCost = 800; 
-                    items.Add(new { description = $"Lab Test: {lab.TestType}", amount = labCost });
+                    var testMaster = await _context.LabTestMasters.FirstOrDefaultAsync(t => t.TestName == lab.TestType);
+                    decimal labCost = testMaster?.Price ?? 800; 
+                    items.Add(new { description = $"Laboratory: {lab.TestType}", amount = labCost });
                     total += labCost;
+                    
+                    // Also update the lab order with price and reference range if not already set
+                    if (testMaster != null) {
+                        lab.Price = testMaster.Price;
+                        if (string.IsNullOrEmpty(lab.ReferenceRange)) lab.ReferenceRange = testMaster.NormalRange;
+                    }
                 }
 
-                // Add Medicines to Bill (assume flat 150 per prescription for demo purposes)
+                // Add Medicines to Bill with ACTUAL prices
                 foreach(var presc in prescriptions)
                 {
-                    decimal prescCost = 150;
-                    items.Add(new { description = "Pharmacy Medicines", amount = prescCost });
-                    total += prescCost;
+                    try {
+                        using var doc = System.Text.Json.JsonDocument.Parse(presc.MedicinesJson ?? "[]");
+                        foreach(var m in doc.RootElement.EnumerateArray()) {
+                            string medName = m.GetProperty("name").GetString() ?? "";
+                            int qty = m.GetProperty("count").GetInt32();
+                            var medMaster = await _context.Medicines.FirstOrDefaultAsync(med => med.Name == medName);
+                            decimal medTotal = (medMaster?.Price ?? 50) * qty;
+                            items.Add(new { description = $"Pharmacy: {medName} x{qty}", amount = medTotal });
+                            total += medTotal;
+                        }
+                    } catch {
+                         items.Add(new { description = "Pharmacy Charges", amount = 150 });
+                         total += 150;
+                    }
                 }
 
                 // Auto-create bill
@@ -319,7 +337,7 @@ namespace MediCore.API.Modules.OPD.Controllers
                     AppointmentId = appointment.Id,
                     PatientUserId = appointment.PatientUserId,
                     DoctorProfileId = appointment.DoctorProfileId,
-                    BillSource = "OPD",
+                    BillSource = "OPD_CONSULTATION",
                     SourceReferenceId = appointment.Id,
                     Items = System.Text.Json.JsonSerializer.Serialize(items),
                     SubTotal = total,

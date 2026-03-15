@@ -49,6 +49,9 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                 l.ReportUrl,
                 l.CreatedAt,
                 l.CompletedAt,
+                l.Priority,
+                l.ReferenceRange,
+                l.SampleCollectedAt,
                 PatientName = _context.Users.Where(u => u.Id == l.PatientUserId).Select(u => u.FullName).FirstOrDefault(),
                 DoctorName = _context.DoctorProfiles.Where(d => d.Id == l.DoctorProfileId)
                     .Select(d => _context.Users.Where(u => u.Id == d.UserId).Select(u => u.FullName).FirstOrDefault())
@@ -56,6 +59,57 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             }).ToListAsync();
 
             return Ok(new { success = true, data = result });
+        }
+
+        [HttpGet("tests")]
+        public async Task<IActionResult> GetTestMaster()
+        {
+            var tests = await _context.LabTestMasters.OrderBy(t => t.TestName).ToListAsync();
+            return Ok(new { success = true, data = tests });
+        }
+
+        [HttpPost("tests")]
+        public async Task<IActionResult> CreateTestMaster([FromBody] LabTestMaster test)
+        {
+            _context.LabTestMasters.Add(test);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, data = test });
+        }
+
+        [HttpPatch("orders/{id}/collect")]
+        public async Task<IActionResult> MarkSampleCollected(int id)
+        {
+            var order = await _context.LabOrders.FindAsync(id);
+            if (order == null) return NotFound();
+
+            order.Status = "Processing";
+            order.SampleCollectedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = "Sample marked as collected" });
+        }
+
+        [HttpGet("stats")]
+        public async Task<IActionResult> GetLabStats()
+        {
+            var totalOrders = await _context.LabOrders.CountAsync();
+            var pendingOrders = await _context.LabOrders.CountAsync(o => o.Status == "Pending");
+            var processing = await _context.LabOrders.CountAsync(o => o.Status == "Processing");
+            var completed = await _context.LabOrders.CountAsync(o => o.Status == "Completed");
+
+            var revenue = await _context.Bills
+                .Where(b => b.BillSource == "Laboratory" && b.Status == "Paid")
+                .SumAsync(b => b.TotalAmount);
+
+            return Ok(new {
+                success = true,
+                data = new {
+                    totalOrders,
+                    pendingOrders,
+                    processing,
+                    completed,
+                    revenue
+                }
+            });
         }
 
         // PATCH api/laboratory/orders/{id}/complete
@@ -72,6 +126,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             order.Status = "Completed";
             order.ResultNotes = dto.ResultNotes;
             order.ReportUrl = dto.ReportUrl;
+            order.ReferenceRange = testMaster?.NormalRange;
             order.CompletedAt = DateTime.UtcNow;
 
             // Create Bill for Lab

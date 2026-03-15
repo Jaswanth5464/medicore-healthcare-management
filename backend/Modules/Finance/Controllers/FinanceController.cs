@@ -46,7 +46,83 @@ namespace MediCore.API.Modules.Finance.Controllers
             return Ok(new { success = true, data = bills });
         }
 
+        [HttpGet("bills")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff,Receptionist")]
+        public async Task<IActionResult> GetBills()
+        {
+            var bills = await _context.Bills
+                .OrderByDescending(b => b.CreatedAt)
+                .Select(b => new
+                {
+                    b.Id,
+                    b.BillNumber,
+                    b.BillSource,
+                    b.SubTotal,
+                    b.TotalAmount,
+                    b.Status,
+                    b.PaymentMode,
+                    b.CreatedAt,
+                    b.PaidAt,
+                    b.Items,
+                    b.AppointmentId,
+                    PatientName = b.PatientUserId != null ? _context.Users.Where(u => u.Id == b.PatientUserId).Select(u => u.FullName).FirstOrDefault() : "Walk-in Customer",
+                    PatientPhone = b.PatientUserId != null ? _context.Users.Where(u => u.Id == b.PatientUserId).Select(u => u.PhoneNumber).FirstOrDefault() : "N/A",
+                    DoctorName = b.DoctorProfileId != null ? _context.Users.Where(u => u.Id == _context.DoctorProfiles.Where(d => d.Id == b.DoctorProfileId).Select(d => d.UserId).FirstOrDefault()).Select(u => u.FullName).FirstOrDefault() : "Hospital House"
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = bills });
+        }
+
+        [HttpPatch("bills/{id}/status")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff,Receptionist")]
+        public async Task<IActionResult> UpdateBillStatus(int id, [FromBody] UpdateStatusDto dto)
+        {
+            var bill = await _context.Bills.FindAsync(id);
+            if (bill == null) return NotFound();
+
+            bill.Status = dto.Status;
+            if (dto.Status == "Paid")
+            {
+                bill.PaidAt = DateTime.UtcNow;
+                bill.PaymentMode = dto.PaymentMode ?? "Cash";
+            }
+            bill.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = "Bill status updated successfully" });
+        }
+
+        [HttpPost("bills/{id}/email")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff")]
+        public async Task<IActionResult> EmailInvoice(int id, [FromServices] Services.IEmailService emailService)
+        {
+            var bill = await _context.Bills.FindAsync(id);
+            if (bill == null) return NotFound();
+
+            var patient = await _context.Users.FindAsync(bill.PatientUserId);
+            if (patient == null || string.IsNullOrEmpty(patient.Email))
+                return BadRequest(new { success = false, message = "Patient email not found" });
+
+            await emailService.SendInvoiceAsync(
+                patient.Email,
+                patient.FullName,
+                bill.BillNumber,
+                bill.TotalAmount,
+                bill.CreatedAt.ToString("dd MMM yyyy"),
+                bill.Status);
+
+            return Ok(new { success = true, message = "Invoice sent successfully" });
+        }
+
+        public class UpdateStatusDto
+        {
+            public string Status { get; set; } = string.Empty;
+            public string? PaymentMode { get; set; }
+        }
+
         [HttpGet("payment-logs")]
+
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist")]
         public async Task<IActionResult> GetPaymentLogs([FromQuery] int limit = 100)
         {

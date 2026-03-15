@@ -754,15 +754,53 @@
 }
 
 .basket-header {
-  padding: 20px 24px !important;
+  padding: 20px 24px;
   background: #fff;
   border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.basket-pane h3 { color: #0f172a !important; }
-.basket-pane .item-count { background: #f1f5f9; color: #64748b; }
-.basket-pane .clear-btn { color: #ef4444; }
-.basket-pane .clear-btn:hover { background: #fef2f2; }
+.basket-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+
+.clear-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.clear-btn:hover {
+  background: #fef2f2;
+}
+
+.clear-btn svg {
+  width: 14px;
+  height: 14px;
+}
 
 .basket-items {
   flex: 1;
@@ -951,18 +989,74 @@
   padding: 24px;
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.total-price { color: #0f172a; }
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.total-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.total-label span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.total-label small {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.total-price {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+}
 
 .checkout-btn {
+  width: 100%;
+  padding: 16px;
   background: #0f172a;
   color: #fff;
-  border-radius: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
   font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.checkout-btn:hover:not(:disabled) { background: #1e293b; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+.checkout-btn:hover:not(:disabled) {
+  background: #1e293b;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.checkout-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  width: 20px;
+  height: 20px;
+}
 
 /* BILL MODAL STYLES (Nice Printed Bill) */
 .bill-modal-overlay { background: rgba(0,0,0,0.8) !important; }

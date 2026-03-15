@@ -613,7 +613,7 @@
 .med-selector-grid {
   padding: 24px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 20px;
   overflow-y: auto;
   flex: 1;
@@ -624,14 +624,28 @@
 .med-selection-card {
   background: #fff;
   border-radius: 16px;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid #e2e8f0;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  display:flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+}
+
+.med-card-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.med-card-info {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 4px;
 }
 
 .med-selection-card:hover {
@@ -657,6 +671,23 @@
   color: #3b82f6;
   font-weight: 800;
   font-size: 18px;
+}
+
+.med-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.med-card-tag {
+  font-size: 11px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .med-card-stock {
@@ -824,33 +855,89 @@
 }
 
 .customer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 20px;
+}
+
+.input-with-icon {
+  position: relative;
+  width: 100%;
+}
+
+.input-with-icon svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: #94a3b8;
+  pointer-events: none;
 }
 
 .input-with-icon input {
-  padding: 10px 12px 10px 36px;
+  padding: 12px 16px 12px 42px;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   width: 100%;
-  font-size: 13px;
+  font-size: 14px;
   background: #f8fafc;
   outline: none;
   transition: all 0.2s;
   color: #0f172a;
 }
 
-.input-with-icon input:focus { border-color: #3b82f6; background: #fff; }
+.input-with-icon.full-width {
+  grid-column: 1 / -1;
+}
+
+.input-with-icon input:focus { border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.05); }
 
 .checkbox-label { color: #64748b; }
 .checkbox-label input { accent-color: #3b82f6; }
 
+.payment-method {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-method label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.payment-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
 .payment-chips button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   color: #475569;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .payment-chips button.active {

@@ -156,6 +156,23 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<MediCoreHub>("/hubs/medicore");
 
+// --- Auto-fix production database schema for Walk-in sales ---
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<MediCoreDbContext>();
+    db.Database.ExecuteSqlRaw(@"
+        IF COL_LENGTH('Bills', 'BillSource') IS NULL 
+        BEGIN
+            ALTER TABLE Bills ADD BillSource nvarchar(max) NOT NULL DEFAULT 'OPD';
+            ALTER TABLE Bills ALTER COLUMN PatientUserId int NULL;
+            ALTER TABLE Bills ALTER COLUMN DoctorProfileId int NULL;
+            ALTER TABLE Bills ALTER COLUMN AppointmentId int NULL;
+            IF COL_LENGTH('Bills', 'SourceReferenceId') IS NULL 
+                ALTER TABLE Bills ADD SourceReferenceId int NULL;
+        END
+    ");
+}
+
 app.Run();
 
 // Custom UserIdProvider for SignalR

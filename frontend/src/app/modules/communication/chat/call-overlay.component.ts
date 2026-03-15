@@ -281,19 +281,53 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
   }
 
   private async setupMedia() {
+    const getStream = async (constraints: MediaStreamConstraints): Promise<MediaStream> => {
+      const mediaDevices = navigator?.mediaDevices;
+      if (mediaDevices?.getUserMedia) {
+        return mediaDevices.getUserMedia(constraints);
+      }
+
+      const legacyGetUserMedia =
+        (navigator as any).getUserMedia ||
+        (navigator as any).webkitGetUserMedia ||
+        (navigator as any).mozGetUserMedia;
+
+      if (!legacyGetUserMedia) {
+        throw new Error('getUserMedia is not available in this browser/context');
+      }
+
+      return new Promise((resolve, reject) => {
+        legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+      });
+    };
+
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
+      this.localStream = await getStream({
         video: this.callType === 'video',
         audio: true
       });
-      setTimeout(() => {
-        if (this.localVideoEl?.nativeElement)
-          this.localVideoEl.nativeElement.srcObject = this.localStream;
-      }, 100);
     } catch (e) {
-      console.warn('[WebRTC] Media access denied, continuing audio-only', e);
-      this.callType = 'audio';
+      if (this.callType === 'video') {
+        console.warn('[WebRTC] Video media access failed, retrying audio-only', e);
+        try {
+          this.localStream = await getStream({ video: false, audio: true });
+          this.callType = 'audio';
+        } catch (audioError) {
+          console.warn('[WebRTC] Audio media access failed, continuing without local stream', audioError);
+          this.localStream = null;
+          this.callType = 'audio';
+        }
+      } else {
+        console.warn('[WebRTC] Audio media access failed, continuing without local stream', e);
+        this.localStream = null;
+      }
     }
+
+    setTimeout(() => {
+      if (this.localVideoEl?.nativeElement) {
+        this.localVideoEl.nativeElement.srcObject = this.localStream;
+      }
+    }, 100);
   }
 
   private createPeerConnection() {

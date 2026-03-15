@@ -9,7 +9,6 @@ import { AuthService } from '../../../core/services/auth.service';
 import { SignalRService, ChatMessage } from '../../../core/services/signalr.service';
 import { ConfigService } from '../../../core/services/config.service';
 import { CallOverlayComponent } from './call-overlay.component';
-import { CryptoService } from '../../../core/services/crypto.service';
 
 const DEPT_ORDER: Record<string, number> = {
   Doctor: 1, Nurse: 2, Receptionist: 3, LabTechnician: 4,
@@ -181,7 +180,7 @@ const ROLE_COLOR: Record<string, string> = {
                 </div>
                 <div class="bubble" [class.sent]="isMine(msg)">
                   <img *ngIf="msg.imageUrl" [src]="msg.imageUrl" class="bubble-img" (click)="lightboxUrl = msg.imageUrl!" />
-                  <p *ngIf="msg.message">{{ getDecrypted(msg) }}</p>
+                  <p *ngIf="msg.message">{{ msg.message }}</p>
                   <div class="bubble-meta">
                     <span class="bt">{{ msg.sentAt | date:'h:mm a' }}</span>
                     <span class="status-ico" *ngIf="isMine(msg)">
@@ -463,13 +462,6 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   readonly auth = inject(AuthService);
   readonly signalR = inject(SignalRService);
   private config = inject(ConfigService);
-  private crypto = inject(CryptoService);
-
-  // FIX: decryptionPending tracks which message keys are already queued for
-  // decryption. Without this, getDecrypted() fires a new Promise on every
-  // change-detection cycle, causing an infinite signal-update loop.
-  private decryptionPending = new Set<number | string>();
-  decryptedTexts = signal<Map<number | string, string>>(new Map());
 
   availableUsers = signal<any[]>([]);
   selectedUserId = signal<string | null>(null);
@@ -509,44 +501,6 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
       (String(m.fromUserId) === meId && String(m.toUserId) === String(selId))
     ).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   });
-
-  /**
-   * FIX: Returns decrypted text for a message without triggering an infinite loop.
-   * Uses decryptionPending to ensure decrypt() is only called once per message,
-   * not on every Angular change-detection cycle.
-   */
-  getDecrypted(msg: ChatMessage): string {
-    const key = msg.id ?? msg.sentAt.toString();
-    const cache = this.decryptedTexts();
-    if (cache.has(key)) return cache.get(key)!;
-    
-    // If it's already plaintext (e.g. just sent by us), return it
-    if (!msg.message?.startsWith('ENC:')) return msg.message ?? '';
-
-    if (!this.decryptionPending.has(key)) {
-      this.decryptionPending.add(key);
-      const myId = String(this.auth.currentUser()?.id);
-      const otherId = String(msg.fromUserId) === myId ? String(msg.toUserId) : String(msg.fromUserId);
-      
-      this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
-        this.decryptionPending.delete(key);
-        this.decryptedTexts.update(m => { 
-          const n = new Map(m); 
-          n.set(key, plain); 
-          return n; 
-        });
-      }).catch(err => {
-        console.warn('Decryption failed for hospital message', key, err);
-        this.decryptionPending.delete(key);
-        this.decryptedTexts.update(m => { 
-          const n = new Map(m); 
-          n.set(key, '[Decryption error]'); 
-          return n; 
-        });
-      });
-    }
-    return '⋯ Decrypting...';
-  }
 
   constructor() {
     this.loadStaff();
@@ -626,17 +580,12 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
     this.isSending.set(true);
 
     try {
-      // FIX: Encrypt the message before sending. Previously this component sent
-      // plaintext while getDecrypted() expected ENC: prefixed ciphertext — inconsistent.
-      const encrypted = await this.crypto.encrypt(msg, myId, this.selectedUserId()!);
+      // FIX: Register the message as a pending echo BEFORE invoking SignalR
+      this.signalR.markEcho(this.selectedUserId()!, msg);
 
-      // FIX: Register the encrypted form as a pending echo BEFORE invoking SignalR
-      // so that when the server echoes ENC:... back, it is suppressed by signalr.service.
-      this.signalR.markEcho(this.selectedUserId()!, encrypted);
+      await this.signalR.sendChatMessage(this.selectedUserId()!, msg, imageUrl);
 
-      await this.signalR.sendChatMessage(this.selectedUserId()!, encrypted, imageUrl);
-
-      // Add plaintext optimistically to local UI (never the ciphertext).
+      // Add plaintext optimistically to local UI
       this.signalR.chatMessages.update(ms => [...ms, {
         id: Date.now(),
         fromUserId: myId,

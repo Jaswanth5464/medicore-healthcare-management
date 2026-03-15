@@ -9,6 +9,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { SignalRService, ChatMessage } from '../../../core/services/signalr.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { CryptoService } from '../../../core/services/crypto.service';
 import { CallOverlayComponent } from './call-overlay.component';
 
 @Component({
@@ -57,7 +58,7 @@ import { CallOverlayComponent } from './call-overlay.component';
              [class.sent]="isSentByMe(msg)">
           <div class="message-bubble">
             <img *ngIf="msg.imageUrl" [src]="msg.imageUrl" class="chat-img" (click)="lightboxUrl = msg.imageUrl!" />
-            <p *ngIf="msg.message">{{ msg.message }}</p>
+            <p *ngIf="msg.message">{{ getDecrypted(msg) }}</p>
             <span class="message-time">{{ msg.sentAt | date:'shortTime' }}</span>
           </div>
         </div>
@@ -195,6 +196,7 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
   private auth = inject(AuthService);
   private config = inject(ConfigService);
   private signalR = inject(SignalRService);
+  private crypto = inject(CryptoService);
 
   newMessage = '';
   selectedFile: File | null = null;
@@ -219,6 +221,32 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
     ).sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   });
 
+  /**
+   * FIX: Returns decrypted text without causing an infinite signal loop.
+   * decryptionPending ensures each message is only decrypted once regardless
+   * of how many times Angular's change detection calls this method.
+   */
+  getDecrypted(msg: ChatMessage): string {
+    const key = msg.id ?? msg.sentAt.toString();
+    const cache = this.decryptedTexts();
+    if (cache.has(key)) return cache.get(key)!;
+    if (!msg.message?.startsWith('ENC:')) return msg.message ?? '';
+
+    if (!this.decryptionPending.has(key)) {
+      this.decryptionPending.add(key);
+      const myId = String(this.auth.currentUser()?.id);
+      const otherId = String(this.otherUserId);
+      this.crypto.decrypt(msg.message, myId, otherId).then(plain => {
+        this.decryptionPending.delete(key);
+        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, plain); return n; });
+      }).catch(() => {
+        this.decryptionPending.delete(key);
+        this.decryptedTexts.update(m => { const n = new Map(m); n.set(key, '[decryption error]'); return n; });
+      });
+    }
+    return '⋯ Decrypting...';
+  }
+
   isOnline(): boolean {
     return this.signalR.isUserOnline(String(this.otherUserId));
   }
@@ -231,6 +259,9 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
     if (changes['otherUserId'] && this.otherUserId) {
       this.loadHistory();
       this.signalR.activeChatPartner.set(this.otherUserId);
+      // Clear stale decryption state when switching conversation partners
+      this.decryptionPending.clear();
+      this.decryptedTexts.set(new Map());
     }
   }
 
@@ -243,20 +274,14 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
       headers: { Authorization: `Bearer ${this.auth.getAccessToken()}` }
     }).subscribe({
       next: (res) => {
-        if (res.success && res.data) {
-          const incoming = res.data as ChatMessage[];
-          this.signalR.chatMessages.update(existing => {
-            const existingIds = new Set(existing.map(e => e.id).filter(id => id !== undefined));
-            const newOnes = incoming.filter(m => m.id && !existingIds.has(m.id));
-            return [...existing, ...newOnes].sort((a, b) => 
-                new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
-            );
-          });
+        if (res.success && res.data?.length) {
+          const existing = this.signalR.chatMessages();
+          const existingIds = new Set(existing.map((e: any) => e.id));
+          const newOnes = res.data.filter((m: any) => m.id && !existingIds.has(m.id));
+          this.signalR.chatMessages.set([...existing, ...newOnes]);
         }
       },
-      error: (err) => {
-        console.error('Failed to load history', err);
-      }
+      error: () => { /* Silently ignore - user may not have access */ }
     });
   }
 
@@ -285,22 +310,29 @@ export class PatientDoctorChatComponent implements AfterViewChecked, OnChanges {
       this.previewUrl = null;
     }
 
-    const msgData = this.newMessage;
+    const msg = this.newMessage;
     const myId = String(this.auth.currentUser()?.id);
 
-    // FIX: Register the message as a pending echo BEFORE invoking SignalR
-    this.signalR.markEcho(String(this.otherUserId), msgData);
+    // Encrypt before sending — the server only ever stores ciphertext.
+    const encrypted = await this.crypto.encrypt(msg, myId, String(this.otherUserId));
+
+    // FIX: Register the encrypted payload as a pending echo BEFORE invoking
+    // SignalR. The server echoes the exact ciphertext we sent; without this,
+    // the echo arrives as a new incoming message and is displayed as a duplicate
+    // (especially visible as two bubbles — one plaintext, one "Decrypting...").
+    this.signalR.markEcho(String(this.otherUserId), encrypted);
 
     this.isUploading.set(true);
     try {
-      await this.signalR.sendPatientDoctorMessage(String(this.otherUserId), msgData, imageUrl);
+      await this.signalR.sendPatientDoctorMessage(String(this.otherUserId), encrypted, imageUrl);
 
       // Add plaintext optimistically so the sender sees their own message
+      // immediately without waiting for decryption on the next render.
       this.signalR.chatMessages.update(msgs => [...msgs, {
         id: Date.now(),
         fromUserId: myId,
         toUserId: String(this.otherUserId),
-        message: msgData,   // plaintext for local display
+        message: msg,   // plaintext for local display only
         imageUrl,
         sentAt: new Date()
       }]);

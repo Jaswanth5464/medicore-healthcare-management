@@ -198,16 +198,8 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
   };
 
   private readonly onReceiveIceCandidate = async (_from: string, candidate: string) => {
-    if (this.pc && this.pc.remoteDescription) {
-      try { 
-        console.log('[WebRTC] Adding ICE candidate');
-        await this.pc.addIceCandidate(JSON.parse(candidate)); 
-      } catch (e) {
-        console.error('[WebRTC] Error adding ICE candidate', e);
-      }
-    } else {
-      console.log('[WebRTC] Queueing ICE candidate (remoteDescription not set)');
-      this.iceCandidateQueue.push(JSON.parse(candidate));
+    if (this.pc) {
+      try { await this.pc.addIceCandidate(JSON.parse(candidate)); } catch {}
     }
   };
 
@@ -281,47 +273,28 @@ export class CallOverlayComponent implements OnInit, OnDestroy {
       console.error('[WebRTC] handleRemoteOffer called before RTCPeerConnection was created');
       return;
     }
-    const offer = JSON.parse(offerJson);
-    console.log('[WebRTC] Setting remote offer');
-    await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
-    
+    await this.pc.setRemoteDescription(JSON.parse(offerJson));
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
     this.signalR.sendAnswer(this.callerId, JSON.stringify(answer));
     this.offerPending = null;
-
-    // Process queued candidates
-    console.log('[WebRTC] Processing queued ICE candidates:', this.iceCandidateQueue.length);
-    while (this.iceCandidateQueue.length > 0) {
-      const candidate = this.iceCandidateQueue.shift();
-      try { await this.pc.addIceCandidate(candidate); } catch (e) { console.error('[WebRTC] Error adding queued candidate', e); }
-    }
   }
 
   private async setupMedia() {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Media devices API not available');
-      }
-
       this.localStream = await navigator.mediaDevices.getUserMedia({
         video: this.callType === 'video',
         audio: true
       });
-      console.log('[WebRTC] Local media stream obtained');
-      
       setTimeout(() => {
         if (this.localVideoEl?.nativeElement)
           this.localVideoEl.nativeElement.srcObject = this.localStream;
       }, 100);
     } catch (e) {
-      console.error('[WebRTC] Media access failed:', e);
-      alert('Cannot access camera/microphone. Please ensure you are using HTTPS and have granted permissions.');
-      this.callType = 'audio'; // Fallback attempt or just fail gracefully
+      console.warn('[WebRTC] Media access denied, continuing audio-only', e);
+      this.callType = 'audio';
     }
   }
-
-  private iceCandidateQueue: any[] = [];
 
   private createPeerConnection() {
     this.pc = new RTCPeerConnection({ iceServers: this.ICE_SERVERS });

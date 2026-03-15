@@ -763,9 +763,10 @@
 }
 
 .basket-actions {
-  display: flex;
+  display: flex !important;
   align-items: center;
   gap: 12px;
+  min-width: fit-content;
 }
 
 .item-count {
@@ -776,6 +777,7 @@
   padding: 4px 10px;
   border-radius: 20px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .clear-btn {
@@ -1001,8 +1003,10 @@
 }
 
 .total-label {
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start;
+  gap: 2px;
 }
 
 .total-label span {
@@ -1011,12 +1015,14 @@
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 1px;
+  display: block;
 }
 
 .total-label small {
   font-size: 11px;
   color: #cbd5e1;
   font-weight: 500;
+  display: block;
 }
 
 .total-price {

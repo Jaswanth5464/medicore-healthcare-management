@@ -18,6 +18,7 @@ namespace MediCore.API.Modules.Laboratory.Models
 
         public string Priority { get; set; } = "Regular"; // Regular, STAT (Urgent)
         public string? ReferenceRange { get; set; }
+        public decimal Price { get; set; }
         public DateTime? SampleCollectedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? CompletedAt { get; set; }

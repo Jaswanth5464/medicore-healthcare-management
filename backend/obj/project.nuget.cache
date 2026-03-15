@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "os9PfBfH8Xw=",
+  "dgSpecHash": "Jdn2B+vEgE0=",
   "success": true,
-  "projectFilePath": "C:\\Users\\j.kanamarlapudi\\source\\repos\\MediCore\\MediCore.API\\MediCore.API.csproj",
+  "projectFilePath": "C:\\Users\\j.kanamarlapudi\\source\\repos\\MediCore-HMS\\backend\\MediCore.API.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\j.kanamarlapudi\\.nuget\\packages\\awssdk.core\\4.0.3.15\\awssdk.core.4.0.3.15.nupkg.sha512",
     "C:\\Users\\j.kanamarlapudi\\.nuget\\packages\\awssdk.simpleemail\\4.0.2.14\\awssdk.simpleemail.4.0.2.14.nupkg.sha512",

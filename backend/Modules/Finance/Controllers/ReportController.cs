@@ -38,13 +38,24 @@ namespace MediCore.API.Modules.Finance.Controllers
                 .Where(b => b.Status == "Paid")
                 .SumAsync(b => b.TotalAmount);
 
-            var revenueByDept = await _context.Bills
-                .Where(b => b.Status == "Paid" && b.BillSource == "OPD" && b.AppointmentId != null)
-                .Include(b => b.Appointment)
-                .ThenInclude(a => a.Department)
-                .GroupBy(b => b.Appointment!.Department!.Name)
-                .Select(g => new { Department = g.Key ?? "General", Amount = g.Sum(b => b.TotalAmount) })
+            // Broaden department revenue to include all modules and fix potential null reference during grouping
+            var rawBills = await _context.Bills
+                .Where(b => b.Status == "Paid")
+                .Select(b => new {
+                    b.BillSource,
+                    DepartmentName = b.Appointment != null && b.Appointment.Department != null ? b.Appointment.Department.Name : null,
+                    b.TotalAmount
+                })
                 .ToListAsync();
+
+            var revenueByDept = rawBills
+                .GroupBy(b => b.BillSource == "Pharmacy" ? "Pharmacy" : 
+                             b.BillSource == "Laboratory" ? "Laboratory" : 
+                             b.BillSource == "Walk-in" ? "Walk-in" :
+                             (b.DepartmentName ?? "General"))
+                .Select(g => new { Department = g.Key, Amount = g.Sum(b => b.TotalAmount) })
+                .OrderByDescending(g => g.Amount)
+                .ToList();
 
             var revenueBySource = await _context.Bills
                 .Where(b => b.Status == "Paid")

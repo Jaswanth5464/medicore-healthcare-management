@@ -9,7 +9,7 @@ namespace MediCore.API.Modules.Finance.Models
 
         // Relationships
         public int? AppointmentId { get; set; }
-        public int PatientUserId { get; set; }
+        public int? PatientUserId { get; set; }
         public int? DoctorProfileId { get; set; }
 
         public string BillSource { get; set; } = "OPD"; // OPD, Pharmacy, Laboratory

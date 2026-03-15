@@ -634,26 +634,32 @@ interface UserListResponse {
             <span class="stat-value">{{ systemStats()?.totalAppointments || 0 }}</span>
           </div>
         </div>
-      </div>       <!-- Premium Revenue Dashboard -->
+      </div>      <!-- Premium Revenue Dashboard -->
       <!-- Source Cards Row -->
-      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px;">
-        <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 8px 20px rgba(59,130,246,0.15);">
           <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
           <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;opacity:0.75;margin-bottom:8px;">OPD CONSULTATIONS</div>
           <div style="font-size:28px;font-weight:800;">&#8377;{{ getSourceRevenue('OPD') | number:'1.0-0' }}</div>
           <div style="margin-top:10px;font-size:11px;opacity:0.7;">Appointment Fees</div>
         </div>
-        <div style="background:linear-gradient(135deg,#10b981,#047857); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#10b981,#047857); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 8px 20px rgba(16,185,129,0.15);">
           <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
           <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;opacity:0.75;margin-bottom:8px;">PHARMACY SALES</div>
           <div style="font-size:28px;font-weight:800;">&#8377;{{ getSourceRevenue('Pharmacy') | number:'1.0-0' }}</div>
-          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Medicines &amp; Prescriptions</div>
+          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Prescription Medicines</div>
         </div>
-        <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#f59e0b,#d97706); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 8px 20px rgba(245,158,11,0.15);">
+          <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;opacity:0.75;margin-bottom:8px;">WALK-IN SALES</div>
+          <div style="font-size:28px;font-weight:800;">&#8377;{{ getSourceRevenue('Walk-in') | number:'1.0-0' }}</div>
+          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Offline Counter Revenue</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 8px 20px rgba(139,92,246,0.15);">
           <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;background:rgba(255,255,255,0.07);border-radius:50%;"></div>
           <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;opacity:0.75;margin-bottom:8px;">LABORATORY</div>
           <div style="font-size:28px;font-weight:800;">&#8377;{{ getSourceRevenue('Laboratory') | number:'1.0-0' }}</div>
-          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Tests &amp; Diagnostics</div>
+          <div style="margin-top:10px;font-size:11px;opacity:0.7;">Tests & Diagnostics</div>
         </div>
       </div>
       <!-- Total Banner -->
@@ -1085,10 +1091,11 @@ interface UserListResponse {
     </div>
   `,
   styles: [`
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'DM Sans', sans-serif; }
+    h1, h2, h3, .stat-value { font-family: 'Outfit', sans-serif; }
 
-    .admin { padding: 0; }
+    .admin { padding: 0; background: #f8fafc; min-height: 100vh; }
 
     /* Page Header */
     .page-header {
@@ -1096,8 +1103,8 @@ interface UserListResponse {
       justify-content: space-between; gap: 16px;
       margin-bottom: 24px; flex-wrap: wrap;
     }
-    .page-header h1 { font-size: 22px; font-weight: 700; color: #0a2744; letter-spacing: -0.3px; }
-    .page-header p { font-size: 13px; color: #64748b; margin-top: 3px; }
+    .page-header h1 { font-size: 26px; font-weight: 800; color: #0a2744; letter-spacing: -0.5px; }
+    .page-header p { font-size: 14px; color: #64748b; margin-top: 4px; font-weight: 500; }
 
     /* Stats */
     .stats-grid {
@@ -1128,27 +1135,63 @@ interface UserListResponse {
       padding: 4px 8px; border-radius: 100px;
     }
 
+    /* Page Tabs - Premium Pill Style */
+    .page-tabs {
+      display: flex; gap: 8px; margin-bottom: 24px;
+      overflow-x: auto; padding-bottom: 4px; padding: 4px;
+      scrollbar-width: none; background: #f1f5f9;
+      border-radius: 14px; width: fit-content;
+    }
+    .page-tabs::-webkit-scrollbar { display: none; }
+    .page-tab {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: 10px; border: none;
+      background: transparent; font-size: 13px; font-weight: 500;
+      color: #64748b; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      white-space: nowrap;
+    }
+    .page-tab svg { width: 16px; height: 16px; opacity: 0.7; }
+    .page-tab:hover { background: rgba(255,255,255,0.5); color: #0f172a; }
+    .page-tab.active {
+      background: white; color: #3b82f6; font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .page-tab.active svg { color: #3b82f6; opacity: 1; }
+    .page-tab-count {
+      font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 6px;
+      background: #e2e8f0; color: #64748b; margin-left: 4px;
+    }
+    .page-tab.active .page-tab-count { background: #eff6ff; color: #3b82f6; }
+
     /* Section Card */
     .section-card {
-      background: white; border-radius: 16px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      border: 1px solid #f1f5f9; overflow: hidden;
+      background: white; border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+      border: 1px solid rgba(226,232,240,0.8); overflow: hidden;
+      margin-bottom: 24px;
     }
 
     .section-header {
       display: flex; align-items: center;
       justify-content: space-between; gap: 16px;
-      padding: 20px 24px; border-bottom: 1px solid #f1f5f9;
+      padding: 24px 28px; border-bottom: 1px solid #f1f5f9;
       flex-wrap: wrap;
     }
 
     /* Reports Styles */
     .reports-container { animation: fadeIn 0.3s ease; }
     .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .r-stat-card { background: #fff; padding: 20px; border-radius: 14px; border: 1px solid #f1f5f9; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .r-stat-card.orange { border-left: 4px solid #f59e0b; }
-    .r-stat-card .lbl { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; }
-    .r-stat-card .val { font-size: 28px; font-weight: 800; color: #0a2744; }
+    .r-stat-card {
+      background: #fff; padding: 24px; border-radius: 18px;
+      border: 1px solid rgba(226,232,240,0.8);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+      transition: transform 0.2s;
+    }
+    .r-stat-card:hover { transform: translateY(-2px); }
+    .r-stat-card.orange { border-top: 4px solid #f59e0b; }
+    .r-stat-card .lbl { font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; }
+    .r-stat-card .val { font-size: 32px; font-weight: 800; color: #0f172a; }
 
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
@@ -1238,9 +1281,19 @@ interface UserListResponse {
       letter-spacing: 0.5px; white-space: nowrap;
     }
 
-    .user-row { border-bottom: 1px solid #f1f5f9; transition:  background  0.15s; }
-    .user-row:hover { background: #f8fafc; }
-    .user-row td { padding: 12px 16px; }
+    .user-row { border-bottom: 1px solid #f1f5f9; transition: all 0.2s; }
+    .user-row:hover { background: #f8fafc; transform: scale(1.002); }
+    .user-row td { padding: 14px 16px; }
+
+    .audit-row { border-bottom: 1px solid #f1f5f9; }
+    .audit-row:hover { background: #f8fafc; }
+    .method-badge {
+      font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 6px; text-transform: uppercase;
+    }
+    .method-badge.post { background: #dcfce7; color: #16a34a; }
+    .method-badge.get { background: #eff6ff; color: #3b82f6; }
+    .method-badge.put { background: #fef9c3; color: #ca8a04; }
+    .method-badge.delete { background: #fee2e2; color: #dc2626; }
 
     .user-cell { display: flex; align-items: center; gap: 10px; }
 

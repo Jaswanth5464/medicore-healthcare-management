@@ -242,13 +242,8 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 // In a real HMS, we might have a placeholder user or additional fields in Bill
             };
             
-            // Note: Since Bill model requires PatientUserId, we should either allow it to be nullable 
-            // or use a default "Walk-in" user ID. For now, let's assume Bill needs a user or we use a system guest ID.
-            // If PatientUserId is not nullable, this might fail. Checking Bill.cs again...
-            // It's 'public int PatientUserId { get; set; }'. 
-            // Let's find/create a Guest User or make it nullable if possible. 
-            // In many HMS, PatientUserId 0 or a specific ID like 1 is for Walk-ins.
-            bill.PatientUserId = dto.PatientUserId ?? 0; // Default to 0 or provided ID
+            // Note: Since Bill model now allows null for PatientUserId, we assign it directly
+            bill.PatientUserId = dto.PatientUserId; // Allow null for walk-ins
 
             _context.Bills.Add(bill);
             await _context.SaveChangesAsync();

@@ -127,10 +127,14 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
     {
-        policy.SetIsOriginAllowed(origin => true)
+        policy.WithOrigins(
+                "http://localhost:4200",
+                "http://medicore-frontend-jaswanth.s3-website-us-east-1.amazonaws.com"
+            )
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials();
+            .AllowCredentials()
+            .SetIsOriginAllowedToAllowWildcardSubdomains();
     });
 });
 

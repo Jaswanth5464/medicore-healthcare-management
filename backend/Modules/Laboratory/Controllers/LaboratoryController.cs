@@ -78,6 +78,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             var bill = new Bill
             {
                 BillNumber = $"LAB-{DateTime.UtcNow:yyyyMMdd}-{order.Id}",
+                AppointmentId = order.AppointmentId,
                 PatientUserId = order.PatientUserId,
                 DoctorProfileId = order.DoctorProfileId,
                 BillSource = "Laboratory",

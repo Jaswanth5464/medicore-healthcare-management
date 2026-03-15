@@ -370,7 +370,7 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
     .test-card-head code { background:#f1f5f9; color:#475569; padding:4px 8px; border-radius:6px; font-size:12px; }
     .test-price { font-weight:700; color:#10b981; }
     .test-card h4 { margin:0 0 16px 0; color:#1e1b4b; font-size:16px; }
-    .test-details { display:grid; grid-template-columns:1fr 1fr; gap:10px; border-top:1px dashed #f1f5f9; pt-12px; margin-top:12px; padding-top:12px; }
+    .test-details { display:grid; grid-template-columns:1fr 1fr; gap:10px; border-top:1px dashed #f1f5f9; margin-top:12px; padding-top:12px; }
     .detail span { display:block; font-size:11px; color:#94a3b8; text-transform:uppercase; }
     .detail strong { font-size:13px; color:#475569; }
 

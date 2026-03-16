@@ -13,9 +13,57 @@ namespace MediCore.API.Infrastructure.Database
     {
         public static async Task SeedAsync(MediCoreDbContext context)
         {
-            // Note: user guard is now separate - we always seed medicines and lab tests if not present
+            // ─── 0. Seed Roles ───────────────────────────────────────────
+            if (!await context.Roles.AnyAsync())
+            {
+                var roles = new List<Role>
+                {
+                    new Role { Id = 1, Name = "SuperAdmin", Description = "Full system access" },
+                    new Role { Id = 2, Name = "HospitalAdmin", Description = "Hospital management access" },
+                    new Role { Id = 3, Name = "Receptionist", Description = "Front desk operations" },
+                    new Role { Id = 4, Name = "Doctor", Description = "Medical consultation access" },
+                    new Role { Id = 5, Name = "Nurse", Description = "Ward management access" },
+                    new Role { Id = 6, Name = "Pharmacist", Description = "Pharmacist management access" },
+                    new Role { Id = 7, Name = "LabTechnician", Description = "Laboratory access" },
+                    new Role { Id = 8, Name = "FinanceStaff", Description = "Billing and finance access" },
+                    new Role { Id = 9, Name = "Mentor", Description = "Patient mentoring access" },
+                    new Role { Id = 10, Name = "Patient", Description = "Patient portal access" }
+                };
 
-            // 0. Seed Lab Tests and Medicines
+                // Use raw SQL to insert with IDs if necessary, or just AddRange
+                // Since EF might complain about identity insert, we use AddRange and hope for the best 
+                // but usually seeding is better with explicit IDs via Migrations or HasData.
+                // However, for this fix, we will add them manually.
+                context.Roles.AddRange(roles);
+                await context.SaveChangesAsync();
+            }
+
+            // ─── 1. Seed SuperAdmin ──────────────────────────────────────
+            var adminEmail = "jaswanth5464@gmail.com";
+            if (!await context.Users.AnyAsync(u => u.Email == adminEmail))
+            {
+                var adminUser = new User
+                {
+                    FullName = "Jaswanth Kumar",
+                    Email = adminEmail,
+                    PhoneNumber = "9293405122",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.Users.Add(adminUser);
+                await context.SaveChangesAsync();
+
+                // Assign SuperAdmin Role
+                var superAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SuperAdmin");
+                if (superAdminRole != null)
+                {
+                    context.UserRoles.Add(new UserRole { UserId = adminUser.Id, RoleId = superAdminRole.Id });
+                    await context.SaveChangesAsync();
+                }
+            }
+
+            // 2. Seed Lab Tests and Medicines
             // 0. Seed Lab Tests
             var existingLabTests = await context.LabTestMasters.Select(t => t.TestName).ToListAsync();
             var labTestsToSeed = new List<LabTestMaster>

@@ -120,7 +120,7 @@ builder.Services.AddSingleton<IEmailService, EmailService>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
-// Background Hosted Services - Disabled as per previous removal of automation features
+// Background Hosted Services - Disabled
 // builder.Services.AddHostedService<FeedbackEmailService>();
 // builder.Services.AddHostedService<DailyDigestService>();
 // builder.Services.AddHostedService<FollowUpReminderService>();

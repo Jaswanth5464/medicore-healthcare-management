@@ -49,7 +49,7 @@ namespace MediCore.API.Modules.Bed.Controllers
                 .Include(r => r.RoomType)
                 .Include(r => r.Beds)
                 .ThenInclude(b => b.CurrentAdmission)
-                .ThenInclude(a => a != null ? a.PatientUser : null)
+                .ThenInclude(a => a.PatientUser)
                 .Where(r => r.IsActive)
                 .ToListAsync();
 

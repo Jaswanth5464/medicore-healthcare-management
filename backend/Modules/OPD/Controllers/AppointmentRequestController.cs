@@ -370,7 +370,7 @@ namespace MediCore.API.Modules.OPD.Controllers
                 {
                     BillNumber = $"OPD-{DateTime.UtcNow:yyyyMMdd}-{appointment.Id}",
                     AppointmentId = appointment.Id,
-                    PatientUserId = request.PatientUserId ?? 0,
+                    PatientUserId = patientUser.Id,
                     DoctorProfileId = appointment.DoctorProfileId,
                     BillSource = "OPD",
                     SourceReferenceId = appointment.Id,

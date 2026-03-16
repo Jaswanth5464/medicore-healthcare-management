@@ -77,7 +77,7 @@ namespace MediCore.API.Modules.Bed.Controllers
             }
         }
 
-        [HttpPost("force-sync-migrations")]
+        [HttpGet("force-sync-migrations")]
         [AllowAnonymous]
         public async Task<IActionResult> ForceSyncMigrations()
         {

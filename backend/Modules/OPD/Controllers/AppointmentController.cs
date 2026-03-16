@@ -17,15 +17,18 @@ namespace MediCore.API.Modules.OPD.Controllers
         private readonly MediCoreDbContext _context;
         private readonly IHubContext<MediCoreHub> _hubContext;
         private readonly IEmailService _emailService;
+        private readonly IConfiguration _config;
 
         public AppointmentController(
             MediCoreDbContext context, 
             IHubContext<MediCoreHub> hubContext,
-            IEmailService emailService)
+            IEmailService emailService,
+            IConfiguration config)
         {
             _context = context;
             _hubContext = hubContext;
             _emailService = emailService;
+            _config = config;
         }
 
         // GET api/appointments/today
@@ -282,7 +285,12 @@ namespace MediCore.API.Modules.OPD.Controllers
             else if (dto.Status == "Completed" && appointment.CompletedAt == null)
             {
                 appointment.CompletedAt = now;
-                
+                if (dto.FollowUpDate.HasValue)
+                {
+                    appointment.FollowUpDate = dto.FollowUpDate.Value;
+                    appointment.FollowUpReminderSent = false;
+                }
+
                 // Fetch associated consultation data to calculate total bill
                 var labOrders = await _context.LabOrders.Where(l => l.AppointmentId == id).ToListAsync();
                 var prescriptions = await _context.Prescriptions.Where(p => p.AppointmentId == id).ToListAsync();
@@ -330,7 +338,7 @@ namespace MediCore.API.Modules.OPD.Controllers
                 // Auto-create bill
                 var billCount = await _context.Bills.CountAsync(b => b.CreatedAt.Date == now.Date);
                 var billNumber = $"BILL{now:yyyyMMdd}{(billCount + 1):D3}";
-                
+
                 var bill = new MediCore.API.Modules.Finance.Models.Bill
                 {
                     BillNumber = billNumber,
@@ -346,6 +354,21 @@ namespace MediCore.API.Modules.OPD.Controllers
                     CreatedAt = now
                 };
                 _context.Bills.Add(bill);
+
+                // Trigger Feedback Email (Feature 5)
+                try
+                {
+                    var user = await _context.Users.FindAsync(appointment.PatientUserId);
+                    if (user != null && !string.IsNullOrEmpty(user.Email))
+                    {
+                        var feedbackUrl = $"{_config["FrontendUrl"]}/feedback/{appointment.Id}";
+                        await _emailService.SendEmailAsync(
+                            new[] { user.Email },
+                            "How was your visit to MediCore?",
+                            $"Hi {user.FullName}, thank you for your visit today to Dr. {appointment.DoctorProfile?.User?.FullName}. We value your feedback. Please share your experience here: {feedbackUrl}");
+                    }
+                }
+                catch { /* Non-critical failure */ }
             }
 
             await _context.SaveChangesAsync();
@@ -561,12 +584,14 @@ namespace MediCore.API.Modules.OPD.Controllers
                         string? patientName = null;
                         string? tokenNumber = null;
                         string? visitType = null;
+                        bool isVideoConsultation = false;
 
                         if (appt != null)
                         {
                             apptId = appt.Id;
                             tokenNumber = appt.TokenNumber;
                             visitType = appt.VisitType;
+                            isVideoConsultation = appt.IsVideoConsultation;
                             // Get patient name
                             var patient = _context.Users.Find(appt.PatientUserId);
                             patientName = patient?.FullName;
@@ -592,7 +617,8 @@ namespace MediCore.API.Modules.OPD.Controllers
                             PatientName = patientName,
                             TokenNumber = tokenNumber,
                             VisitType = visitType,
-                            Session = session
+                            Session = session,
+                            IsVideoConsultation = isVideoConsultation
                         });
 
                         current = current.Add(slotDuration);
@@ -739,6 +765,7 @@ namespace MediCore.API.Modules.OPD.Controllers
                     Status = "Scheduled",
                     ConsultationFee = doctorProfile.ConsultationFee,
                     PaymentStatus = "Pending",
+                    IsVideoConsultation = dto.IsVideoConsultation,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -901,12 +928,107 @@ namespace MediCore.API.Modules.OPD.Controllers
                 }
             });
         }
+        // Feature 4: GET api/appointments/{id}/video-status
+        [HttpGet("{id}/video-status")]
+        [Authorize]
+        public async Task<IActionResult> GetVideoStatus(int id)
+        {
+            var appt = await _context.Appointments.FindAsync(id);
+            if (appt == null) return NotFound(new { success = false, message = "Appointment not found" });
+
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    hasVideoRoom = !string.IsNullOrEmpty(appt.VideoRoomUrl),
+                    videoUrl = appt.VideoRoomUrl,
+                    videoStartedAt = appt.VideoStartedAt
+                }
+            });
+        }
+
+        // Feature 4: POST api/appointments/{id}/start-video
+        [HttpPost("{id}/start-video")]
+        [Authorize(Roles = "Doctor,SuperAdmin")]
+        public async Task<IActionResult> StartVideoCall(int id)
+        {
+            var appt = await _context.Appointments
+                .Include(a => a.PatientUser)
+                .Include(a => a.DoctorProfile)
+                    .ThenInclude(d => d.User)
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (appt == null) return NotFound(new { success = false, message = "Appointment not found" });
+
+            if (!appt.IsVideoConsultation)
+                return BadRequest(new { success = false, message = "Not a video consultation appointment" });
+
+            // Generate unique room URL
+            var shortGuid = Guid.NewGuid().ToString().Substring(0, 8);
+            appt.VideoRoomUrl = $"https://meet.jit.si/medicore-{appt.Id}-{shortGuid}";
+            appt.VideoStartedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Notify patient via SignalR
+            await _hubContext.Clients.Group($"user-{appt.PatientUserId}")
+                .SendAsync("videoCallStarted", new
+                {
+                    appointmentId = appt.Id,
+                    videoUrl = appt.VideoRoomUrl,
+                    doctorName = appt.DoctorProfile.User.FullName
+                });
+
+            // Send email to patient
+            var emailBody = $@"
+                <div style='font-family: Arial, sans-serif; padding: 20px; background-color: #f4f7f6;'>
+                    <h2 style='color: #0a2744;'>MediCore Video Consultation</h2>
+                    <p>Dear {appt.PatientUser.FullName},</p>
+                    <p>Dr. {appt.DoctorProfile.User.FullName} is ready for your video consultation.</p>
+                    <p><strong>Appointment Time:</strong> {appt.AppointmentDate.ToString("dd MMM yyyy")} at {DateTime.Today.Add(appt.TimeSlot).ToString("hh:mm tt")}</p>
+                    <br/>
+                    <a href='{appt.VideoRoomUrl}' style='background-color: #22c55e; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;'>JOIN VIDEO CALL NOW</a>
+                    <br/><br/>
+                    <p><strong>Tips for a better experience:</strong></p>
+                    <ul>
+                        <li>Use Google Chrome browser</li>
+                        <li>Allow camera and microphone access</li>
+                        <li>Find a quiet place</li>
+                    </ul>
+                    <p>Link expires in 2 hours.</p>
+                </div>";
+
+            await _emailService.SendEmailAsync(
+                new[] { appt.PatientUser.Email },
+                $"Dr. {appt.DoctorProfile.User.FullName} is ready for your video consultation",
+                emailBody,
+                true
+            );
+
+            return Ok(new { success = true, videoUrl = appt.VideoRoomUrl });
+        }
+
+        // Feature 4: POST api/appointments/{id}/end-video
+        [HttpPost("{id}/end-video")]
+        [Authorize(Roles = "Doctor,SuperAdmin")]
+        public async Task<IActionResult> EndVideoCall(int id)
+        {
+            var appt = await _context.Appointments.FindAsync(id);
+            if (appt == null) return NotFound(new { success = false, message = "Appointment not found" });
+
+            appt.VideoEndedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true });
+        }
     }
 
     public class UpdateAppointmentStatusDto
     {
         public string Status { get; set; } = string.Empty;
         public string? DoctorNotes { get; set; }
+        public DateTime? FollowUpDate { get; set; }
     }
 
     public class UpdatePaymentDto
@@ -934,6 +1056,7 @@ namespace MediCore.API.Modules.OPD.Controllers
         public string TimeSlot { get; set; } = string.Empty;
         public string? Symptoms { get; set; }
         public string? VisitType { get; set; }
+        public bool IsVideoConsultation { get; set; } = false;
     }
 }
 

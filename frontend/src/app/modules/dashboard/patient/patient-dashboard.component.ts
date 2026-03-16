@@ -6,6 +6,8 @@ import { AuthService } from '../../../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfigService } from '../../../core/services/config.service';
 import { PatientDoctorChatComponent } from '../../communication/chat/patient-doctor-chat.component';
+import { SignalRService } from '../../../core/services/signalr.service';
+import { VideoCallComponent } from '../../communication/video/video-call.component';
 
 // const BASE_URL = 'https://localhost:7113';
 
@@ -15,9 +17,20 @@ declare var QRCode: any;
 @Component({
   selector: 'app-patient-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, PatientDoctorChatComponent],
+  imports: [CommonModule, FormsModule, PatientDoctorChatComponent, VideoCallComponent],
   template: `
     <div class="patient-dash">
+      <!-- Video Consultation Overlay -->
+      <div class="video-overlay" *ngIf="activeVideoRoom()">
+        <div class="video-modal-content">
+          <app-video-call 
+            [roomName]="activeVideoRoom().roomName" 
+            [userName]="auth.currentUser()?.fullName || 'Patient'"
+            [isDoctor]="false"
+            (onEndCall)="activeVideoRoom.set(null)">
+          </app-video-call>
+        </div>
+      </div>
       <div class="header">
         <div class="header-left">
           <div class="avatar">{{ auth.currentUser()?.fullName?.[0] || 'P' }}</div>
@@ -75,12 +88,15 @@ declare var QRCode: any;
             <button class="text-btn" (click)="activeTab.set('book')">Book one now</button>
           </div>
           <div class="cards-grid" *ngIf="!loading() && upcoming().length > 0">
-            <div class="appt-card" *ngFor="let a of upcoming()">
+            <div class="appt-card" *ngFor="let a of upcoming()" [class.video-card]="a.isVideoConsultation">
               <div class="card-head">
                 <span class="status-badge" [class]="a.status.toLowerCase()">{{ a.status }}</span>
                 <span class="token">Token: #{{ a.tokenNumber }}</span>
               </div>
-              <h3>Dr. {{ a.doctorName }}</h3>
+              <h3 style="display:flex; align-items:center; gap:8px;">
+                Dr. {{ a.doctorName }}
+                <span *ngIf="a.isVideoConsultation" class="video-icon" title="Video Consultation">📹</span>
+              </h3>
               <p class="dept">{{ a.departmentName }}</p>
               <div class="card-details">
                 <div><label>Date</label><span>{{ formatDate(a.appointmentDate) }}</span></div>
@@ -90,7 +106,7 @@ declare var QRCode: any;
               <div class="appt-actions" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="pay-btn text-sm" *ngIf="a.paymentStatus !== 'Paid' && a.paymentStatus !== 'PendingOffline'" (click)="payForAppointment(a)">Pay Online</button>
                 <button class="action-btn-sm" *ngIf="a.paymentStatus !== 'Paid' && a.paymentStatus !== 'PendingOffline'" (click)="requestOfflinePayment(a)">Pay at Reception</button>
-                
+
                 <div *ngIf="a.paymentStatus === 'PendingOffline'" style="color:#b45309; font-weight:700; font-size:13px; margin:auto 0; display:flex; align-items:center; gap:4px; background:#fff7ed; padding:4px 8px; border-radius:8px; border:1px solid #fed7aa;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   Awaiting Reception
@@ -100,7 +116,15 @@ declare var QRCode: any;
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                   Paid
                 </div>
-                
+
+                <!-- Video Join Button -->
+                <button *ngIf="a.isVideoConsultation" 
+                        class="primary-btn pulse" 
+                        style="padding: 6px 12px; font-size: 12px;"
+                        (click)="joinVideoCall(a.id)">
+                  Join Video Call
+                </button>
+
                 <button class="action-btn-sm" (click)="sendReminder(a)" title="Send Reminder Email">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
                   Remind Me
@@ -143,11 +167,19 @@ declare var QRCode: any;
               <div class="card-head">
                 <span class="status-badge" [class]="a.status.toLowerCase()">{{ a.status }}</span>
               </div>
-              <h3>Dr. {{ a.doctorName }}</h3>
+              <h3>
+                Dr. {{ a.doctorName }}
+                <span *ngIf="a.isVideoConsultation" title="Video Consultation">📹</span>
+              </h3>
               <p class="dept">{{ a.departmentName }}</p>
               <div class="card-details">
                 <div><label>Date</label><span>{{ formatDate(a.appointmentDate) }}</span></div>
                 <div><span class="link" (click)="viewPrescription(a.id, a.doctorName, a.appointmentDate)">📄 View Report</span></div>
+              </div>
+              <div style="margin-top: 12px; text-align: right;" *ngIf="a.status === 'Completed'">
+                <button class="secondary-btn text-sm" (click)="openFeedback(a)">
+                  {{ a.feedbackSubmitted ? '⭐ View Feedback' : '⭐ Leave Feedback' }}
+                </button>
               </div>
             </div>
           </div>
@@ -379,6 +411,13 @@ declare var QRCode: any;
               <div class="form-group" style="margin-top:20px;">
                 <label>Symptoms / Reason for visit</label>
                 <textarea [(ngModel)]="bookSymptoms" rows="3"></textarea>
+              </div>
+
+              <div class="form-group" style="margin-top:20px; flex-direction:row; align-items:center; gap:8px;">
+                <input type="checkbox" id="videoConsult" [(ngModel)]="bookIsVideo" style="width:20px; height:20px; accent-color:#6366f1;">
+                <label for="videoConsult" style="font-size:15px; cursor:pointer;">
+                   Is this a video consultation? <span style="font-size:18px;">📹</span>
+                </label>
               </div>
 
               <div style="margin-top:24px; text-align:right;">
@@ -711,13 +750,14 @@ declare var QRCode: any;
     .action-btn-sm { display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #e2e8f0; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; color:#475569; cursor:pointer; }
     .action-btn-sm:hover { background:#f1f5f9; border-color:#cbd5e1; color:#0f172a; }
     .action-btn-sm.qr { border-color:#6366f1; color:#6366f1; background:#f5f3ff; }
-    .action-btn-sm.qr:hover { background:#e0e7ff; }
+    .action-btn-sm.qr:hover { background: #e0e7ff; }
 
     /* QR MODAL */
     .qr-modal { max-width:400px; text-align:center; }
     .qr-body { padding:30px; }
     .qr-token { font-size:28px; font-weight:900; color:#6366f1; font-family:monospace; letter-spacing:2px; margin-bottom:8px; }
     .qr-hint { font-size:13px; color:#64748b; margin-bottom:24px; }
+
     .qr-container { background:#f8fafc; padding:20px; border-radius:16px; border:2px dashed #e2e8f0; display:inline-block; margin-bottom:24px; }
     .qr-container img { display:block; }
     .qr-info { background:#f1f5f9; border-radius:12px; padding:16px; margin-bottom:24px; display:flex; flex-direction:column; gap:10px; }
@@ -765,6 +805,8 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
   past = signal<any[]>([]);
   bills = signal<any[]>([]);
   patientProfile = signal<any>({});
+  bookIsVideo = false;
+  activeVideoRoom = signal<any>(null);
 
   // Patient Visit Streak Logic
   streakData = computed(() => {
@@ -848,6 +890,21 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
       });
   }
 
+  joinVideoCall(apptId: number) {
+    this.http.get<any>(`${this.BASE_URL}/api/appointments/${apptId}/video-status`, { headers: this.getHeaders() })
+      .subscribe({
+        next: (res) => {
+          if (res.success && res.data.hasVideoRoom) {
+            const roomName = res.data.videoUrl.split('/').pop();
+            this.activeVideoRoom.set({ roomName });
+          } else {
+            this.notify.warning('The doctor has not started the video call yet. Please check back at the appointment time.');
+          }
+        },
+        error: () => this.notify.error('Failed to check video status.')
+      });
+  }
+
   printQr() {
     window.print();
   }
@@ -855,7 +912,8 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
   constructor(
     public auth: AuthService,
     private http: HttpClient,
-    private notify: NotificationService
+    private notify: NotificationService,
+    private signalR: SignalRService
   ) { }
 
   ngOnInit() {
@@ -866,6 +924,19 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
     // (Or we can just load them upfront)
     this.loadBills();
     this.loadProfile();
+    this.setupVideoListener();
+  }
+
+  private setupVideoListener() {
+    this.signalR.onWebRtcEvent('videoCallStarted', (data: any) => {
+      console.log('SignalR: Video Call Notification', data);
+      const roomName = data.videoUrl.split('/').pop();
+      
+      this.notify.info(`Dr. ${data.doctorName} is ready for your video consultation. Click the Join button on your appointment card.`);
+
+      // Also auto-update the relevant appointment in the list if it matches
+      this.upcoming.update(list => list.map(a => a.id === data.appointmentId ? { ...a, videoRoomUrl: data.videoUrl } : a));
+    });
   }
 
   getHeaders() {
@@ -904,152 +975,13 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
   }
 
   payBill(bill: any) {
-    this.notify.info('Initializing secure payment gateway...');
-
-    // 1. Create Mock Order
-    this.http.post<any>(`${this.BASE_URL}/api/payment/create-order`, { billId: bill.id }, { headers: this.getHeaders() })
-      .subscribe({
-        next: (orderRes) => {
-          if (orderRes.success) {
-
-            // Open the Razorpay Checkout Form
-            const options = {
-              "key": "rzp_test_mockkey12345", // Mock Test Key
-              "amount": orderRes.amount,
-              "currency": "INR",
-              "name": "MediCore Hospital",
-              "description": `Payment for Bill ${bill.billNumber}`,
-              "image": "https://cdn-icons-png.flaticon.com/512/2966/2966327.png",
-              "order_id": orderRes.orderId,
-              "handler": (response: any) => {
-                this.notify.info('Verifying payment details...');
-
-                const verifyPayload = {
-                  billId: bill.id,
-                  razorpayOrderId: response.razorpay_order_id,
-                  razorpayPaymentId: response.razorpay_payment_id,
-                  razorpaySignature: response.razorpay_signature as string
-                };
-
-                this.http.post<any>(`${this.BASE_URL}/api/payment/verify`, verifyPayload, { headers: this.getHeaders() })
-                  .subscribe({
-                    next: (verifyRes) => {
-                      if (verifyRes.success) {
-                        this.notify.success('Payment successful! Your bill is marked as Paid.');
-                        this.loadBills(); // Refresh UI
-                      } else {
-                        this.notify.error('Payment verification failed. Please contact support.');
-                      }
-                    },
-                    error: (err) => {
-                      this.notify.error('Error verifying payment.');
-                    }
-                  });
-              },
-              "prefill": {
-                "name": this.auth.currentUser()?.fullName,
-                "email": "patient@medicore.local",
-                "contact": "9999999999"
-              },
-              "theme": {
-                "color": "#6366f1"
-              },
-              "modal": {
-                "ondismiss": () => {
-                  this.notify.error('Payment popup closed by user.');
-                }
-              }
-            };
-
-            const rzp = new Razorpay(options);
-            rzp.on('payment.failed', (response: any) => {
-              this.notify.error(response.error.description || 'Payment Failed.');
-            });
-            rzp.open();
-
-          } else {
-            this.notify.error(orderRes.message || 'Failed to initialize payment.');
-          }
-        },
-        error: (err) => {
-          this.notify.error('Server error initializing payment: ' + (err.error?.message || err.message));
-        }
-      });
+    this.notify.info('Online Payments are Launching Soon! 🚀');
+    this.notify.warning('Currently, only payment at reception is available. Please pay at the hospital counter.');
   }
 
   payForAppointment(appt: any) {
-    // Check if there's already a completed bill for this appointment
-    const existingBill = this.bills().find((b: any) => b.appointmentId === appt.id);
-    if (existingBill && existingBill.status === 'Unpaid') {
-      // Bill exists — go to bills tab and show it
-      this.activeTab.set('bills');
-      this.notify.info('Your bill is ready. You can pay it below.');
-      return;
-    }
-
-    // No completed bill yet (appointment still ongoing) — pay consultation fee directly
-    this.notify.info('Initializing secure payment for consultation fee...');
-    const amount = Math.round(appt.consultationFee * 100); // in paise
-
-    const options = {
-      'key': 'rzp_test_mockkey12345',
-      'amount': amount,
-      'currency': 'INR',
-      'name': 'MediCore Hospital',
-      'description': `Consultation Fee — Dr. ${appt.doctorName}`,
-      'image': 'https://cdn-icons-png.flaticon.com/512/2966/2966327.png',
-      'order_id': '',
-      'handler': (response: any) => {
-        // Mark appointment as paid via backend
-        this.http.patch<any>(
-          `${this.BASE_URL}/api/appointments/${appt.id}/payment`,
-          { paymentMode: 'Online', razorpayPaymentId: response.razorpay_payment_id || 'mock_' + Date.now() },
-          { headers: this.getHeaders() }
-        ).subscribe({
-          next: (res) => {
-            if (res.success) {
-              this.notify.success('Payment successful! Consultation fee paid.');
-              this.loadMyData(); // Refresh appointments list
-              this.loadBills();
-            }
-          },
-          error: () => this.notify.error('Payment recorded but status update failed.')
-        });
-      },
-      'prefill': {
-        'name': this.auth.currentUser()?.fullName,
-        'email': 'patient@medicore.local',
-        'contact': '9999999999'
-      },
-      'theme': { 'color': '#6366f1' },
-      'modal': {
-        'ondismiss': () => this.notify.error('Payment cancelled.')
-      }
-    };
-
-    try {
-      const rzp = new Razorpay(options);
-      rzp.on('payment.failed', (response: any) => {
-        this.notify.error(response.error.description || 'Payment failed.');
-      });
-      rzp.open();
-    } catch (e) {
-      // Razorpay not loaded or test mode — simulate success directly
-      this.notify.info('Demo mode: Simulating payment...');
-      setTimeout(() => {
-        this.http.patch<any>(
-          `${this.BASE_URL}/api/appointments/${appt.id}/payment`,
-          { paymentMode: 'Online', razorpayPaymentId: 'demo_' + Date.now() },
-          { headers: this.getHeaders() }
-        ).subscribe({
-          next: () => {
-            this.notify.success('Payment marked as Paid (Demo Mode).');
-            this.loadMyData();
-            this.loadBills();
-          }
-        });
-      }, 1000);
-    }
+    this.notify.info('Online Payments are Launching Soon! 🚀');
+    this.notify.warning('Please visit the hospital reception to pay your consultation fee.');
   }
 
   cancelAppt(appt: any) {
@@ -1298,7 +1230,8 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
       appointmentDate: this.bookDate,
       timeSlot: this.bookTime,
       visitType: 'Consultation',
-      symptoms: this.bookSymptoms
+      symptoms: this.bookSymptoms,
+      isVideoConsultation: this.bookIsVideo // Feature 4 tracking
     };
 
     console.log('Sending Appointment Payload:', payload);
@@ -1318,9 +1251,14 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
           this.bookDate = '';
           this.bookTime = '';
           this.bookSymptoms = '';
+          this.bookIsVideo = false;
         }
       },
       error: () => this.submitting.set(false)
     });
+  }
+
+  openFeedback(appt: any) {
+    this.notify.info('Feedback system is currently under maintenance.');
   }
 }

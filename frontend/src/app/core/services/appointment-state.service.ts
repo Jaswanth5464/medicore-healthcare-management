@@ -38,6 +38,7 @@ export interface CalendarSlot {
   tokenNumber?: string;
   visitType?: string;
   session: string;
+  isVideoConsultation?: boolean;
 }
 
 import { ConfigService } from './config.service';
@@ -129,7 +130,7 @@ export class AppointmentStateService {
   }
 
   // ─── Optimistic status update ─────────────────────────────────────
-  updateStatus(id: number, newStatus: Appointment['status'], headers: any): void {
+  updateStatus(id: number, newStatus: Appointment['status'], headers: any, followUpDate?: string): void {
     // Optimistic: update today signal
     this._today.update(list =>
       list.map(a => a.id === id ? { ...a, status: newStatus } : a)
@@ -146,7 +147,7 @@ export class AppointmentStateService {
 
     // Refresh calendar too
     const date = this._calendarDate();
-    this.http.patch<any>(`${this.BASE_URL}/api/appointments/${id}/status`, { status: newStatus }, { headers })
+    this.http.patch<any>(`${this.BASE_URL}/api/appointments/${id}/status`, { status: newStatus, followUpDate }, { headers })
       .subscribe({
         next: () => {
           // After success, reload to ensure absolute accuracy (queue positions, etc.)

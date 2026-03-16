@@ -23,6 +23,8 @@ export class PharmacistDashboardComponent implements OnInit {
   private ns = inject(NotificationService);
 
   activeTab = signal<'queue' | 'inventory' | 'counter' | 'chat'>('queue');
+  selectedCategory = signal<string>('All');
+  inventoryCategories = signal<string[]>(['All']);
   
   // Data
   queueStr = signal<any[]>([]);
@@ -51,11 +53,41 @@ export class PharmacistDashboardComponent implements OnInit {
 
   // Walk-in Counter State
   walkInBasket = signal<any[]>([]);
-  walkInCustomer = signal({ name: '', phone: '', email: '', paymentMode: 'Cash', sendBillToEmail: false });
+  walkInCustomer = signal({ name: '', phone: '', email: '', paymentMode: 'Cash', sendBillToEmail: false, patientUserId: null as number | null });
   counterSearch = signal('');
-  lastBill = signal<{ billNumber: string; total: number; items: any[]; customerName: string; customerEmail?: string; paymentMode: string } | null>(null);
+  patientSearch = signal('');
+  patientResults = signal<any[]>([]);
+  lastBill = signal<{ billNumber: string; subTotal?: number; gstAmount?: number; total: number; items: any[]; customerName: string; customerEmail?: string; paymentMode: string } | null>(null);
   showBillModal = signal(false);
   qrDataUrl = signal<string>('');
+
+  searchPatients() {
+    const q = this.patientSearch().trim();
+    if (q.length < 3) {
+      this.patientResults.set([]);
+      return;
+    }
+    this.http.get<any>(`${this.BASE_URL}/api/receptionist/patients/search?query=${encodeURIComponent(q)}`)
+      .subscribe(res => {
+        if (Array.isArray(res)) {
+          this.patientResults.set(res);
+        } else if (res && res.data) {
+          this.patientResults.set(res.data);
+        }
+      });
+  }
+
+  selectPatient(p: any) {
+    this.walkInCustomer.update(c => ({
+      ...c,
+      name: p.fullName,
+      phone: p.phoneNumber || p.phone || '',
+      email: p.email || '',
+      patientUserId: p.userId || p.id
+    }));
+    this.patientResults.set([]);
+    this.patientSearch.set('');
+  }
 
   filteredInventory = signal<any[]>([]);
 
@@ -84,6 +116,9 @@ export class PharmacistDashboardComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.inventoryData.set(res.data);
+          // Extract unique categories
+          const cats = ['All', ...new Set(res.data.map(m => m.category).filter(c => !!c))];
+          this.inventoryCategories.set(cats);
           this.updateFilteredInventory();
         },
         error: (err) => {
@@ -94,13 +129,17 @@ export class PharmacistDashboardComponent implements OnInit {
 
   updateFilteredInventory() {
     const q = this.counterSearch().toLowerCase();
+    const cat = this.selectedCategory();
+    
     this.filteredInventory.set(
-      this.inventoryData().filter(m => 
-        m.name?.toLowerCase().includes(q) || 
-        m.genericName?.toLowerCase().includes(q)
-      )
+      this.inventoryData().filter(m => {
+        const matchesSearch = (m.name?.toLowerCase().includes(q) || m.genericName?.toLowerCase().includes(q));
+        const matchesCat = (cat === 'All' || m.category === cat);
+        return matchesSearch && matchesCat;
+      })
     );
   }
+
 
   viewPrescription(rx: any) {
     this.selectedPrescription.set(rx);
@@ -257,8 +296,16 @@ export class PharmacistDashboardComponent implements OnInit {
     });
   }
 
-  get basketTotal() {
+  get subTotal() {
     return this.walkInBasket().reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }
+
+  get gstAmount() {
+    return Math.round(this.subTotal * 0.18 * 100) / 100;
+  }
+
+  get basketTotal() {
+    return this.subTotal + this.gstAmount;
   }
 
   get todayDate() {
@@ -278,6 +325,7 @@ export class PharmacistDashboardComponent implements OnInit {
       customerEmail: cust.sendBillToEmail ? cust.email : undefined,
       sendBillToEmail: cust.sendBillToEmail && !!cust.email,
       paymentMode: cust.paymentMode,
+      patientUserId: cust.patientUserId,
       items: this.walkInBasket().map(i => ({ medicineId: i.id, count: i.quantity }))
     };
 
@@ -287,6 +335,8 @@ export class PharmacistDashboardComponent implements OnInit {
         this.ns.success(`Sale completed! Bill: ${res.billNumber}`);
         this.lastBill.set({
           billNumber: res.billNumber,
+          subTotal: res.subTotal,
+          gstAmount: res.gstAmount,
           total: res.total,
           items: res.items || [],
           customerName: res.customerName || cust.name,
@@ -295,7 +345,8 @@ export class PharmacistDashboardComponent implements OnInit {
         });
         this.generateBillQr(res.billNumber, res.total);
         this.walkInBasket.set([]);
-        this.walkInCustomer.update(c => ({ ...c, name: '', phone: '', email: '', sendBillToEmail: false }));
+        this.walkInCustomer.update(c => ({ ...c, name: '', phone: '', email: '', sendBillToEmail: false, patientUserId: null }));
+        this.patientSearch.set('');
         this.loadInventory();
         this.isLoading.set(false);
         this.showBillModal.set(true);
@@ -305,6 +356,10 @@ export class PharmacistDashboardComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+  }
+
+  printReceipt() {
+    window.print();
   }
 
   generateBillQr(billNumber: string, total: number) {

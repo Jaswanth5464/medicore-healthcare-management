@@ -494,6 +494,11 @@ export class ShellComponent {
         route: '/dashboard/finance',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
       },
+      {
+        label: 'IPD/Beds', roles: ['SuperAdmin', 'HospitalAdmin', 'Receptionist'],
+        route: '/dashboard/ipd',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4h18V5a2 2 0 0 0-2-2h-4m0 0h4M9 3v18m6-18v18m-6-7h6"/></svg>`
+      },
     ];
 
     return allItems.filter(item => item.roles.includes(role));

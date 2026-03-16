@@ -473,7 +473,8 @@ export class AppointmentCalendarComponent implements OnInit, OnDestroy {
       this.patientSelected.emit({ 
         appointmentId: slot.appointmentId, 
         patientName: slot.patientName,
-        patientUserId: slot.patientUserId
+        patientUserId: slot.patientUserId,
+        isVideoConsultation: slot.isVideoConsultation
       });
     }
   }

@@ -1,0 +1,18 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\backend",
+    "\\backend\\Infrastructure",
+    "\\backend\\Infrastructure\\Database",
+    "\\backend\\Infrastructure\\Database\\Context",
+    "\\backend\\Modules",
+    "\\backend\\Modules\\OPD",
+    "\\backend\\Modules\\OPD\\Controllers",
+    "\\backend\\Modules\\OPD\\Models",
+    "\\backend\\Modules\\Pharmacy",
+    "\\backend\\Modules\\Pharmacy\\Controllers",
+    "\\backend\\Services"
+  ],
+  "SelectedNode": "\\backend\\Modules\\OPD\\Controllers\\AppointmentController.cs",
+  "PreviewInSolutionExplorer": false
+}

@@ -146,7 +146,7 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
 
             // Parse medicines and calculate total
             var medList = System.Text.Json.JsonSerializer.Deserialize<List<PrescribedMed>>(prescription.MedicinesJson ?? "[]") ?? new List<PrescribedMed>();
-            decimal totalBill = 0;
+            decimal subTotal = 0;
 
             foreach (var pMed in medList)
             {
@@ -154,8 +154,8 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 if (med != null)
                 {
                     int count = pMed.count > 0 ? pMed.count : 1; 
-                    totalBill += med.Price * count;
-                    
+                    subTotal += med.Price * count;
+
                     // Deduct Stock
                     if (med.StockQuantity >= count)
                     {
@@ -163,6 +163,10 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                     }
                 }
             }
+
+            decimal gstPercent = 18;
+            decimal gstAmount = Math.Round(subTotal * (gstPercent / 100), 2);
+            decimal totalBill = subTotal + gstAmount;
 
             // Mark dispensed
             prescription.IsDispensed = true;
@@ -177,9 +181,11 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 BillSource = "Pharmacy",
                 SourceReferenceId = prescription.Id,
                 Items = prescription.MedicinesJson ?? "[]",
-                SubTotal = totalBill,
+                SubTotal = subTotal,
+                GSTPercent = gstPercent,
+                GSTAmount = gstAmount,
                 TotalAmount = totalBill,
-                Status = "Paid", // For pharmacy, we assume payment is handled at counter before/during dispense
+                Status = "Paid", 
                 PaymentMode = "Cash",
                 PaidAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
@@ -210,7 +216,7 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             if (dto.Items == null || !dto.Items.Any())
                 return BadRequest(new { success = false, message = "No items in basket" });
 
-            decimal totalBill = 0;
+            decimal subTotal = 0;
             var itemsSummary = new List<object>();
 
             foreach (var item in dto.Items)
@@ -222,9 +228,13 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                     return BadRequest(new { success = false, message = $"Insufficient stock for {med.Name}" });
 
                 med.StockQuantity -= item.Count;
-                totalBill += med.Price * item.Count;
+                subTotal += med.Price * item.Count;
                 itemsSummary.Add(new { name = med.Name, count = item.Count, price = med.Price });
             }
+
+            decimal gstPercent = 18;
+            decimal gstAmount = Math.Round(subTotal * (gstPercent / 100), 2);
+            decimal totalBill = subTotal + gstAmount;
 
             // Create Bill for Walk-in
             var bill = new Bill
@@ -232,18 +242,16 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 BillNumber = $"WALK-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}",
                 BillSource = "Pharmacy",
                 Items = System.Text.Json.JsonSerializer.Serialize(itemsSummary),
-                SubTotal = totalBill,
+                SubTotal = subTotal,
+                GSTPercent = gstPercent,
+                GSTAmount = gstAmount,
                 TotalAmount = totalBill,
                 Status = "Paid",
                 PaymentMode = dto.PaymentMode ?? "Cash",
                 PaidAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
-                // For walk-in, we store customer details in a generic way or skip IDs
-                // In a real HMS, we might have a placeholder user or additional fields in Bill
+                PatientUserId = dto.PatientUserId
             };
-            
-            // Note: Since Bill model now allows null for PatientUserId, we assign it directly
-            bill.PatientUserId = dto.PatientUserId; // Allow null for walk-ins
 
             _context.Bills.Add(bill);
             await _context.SaveChangesAsync();
@@ -269,6 +277,8 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 message = "Sale completed successfully",
                 billNumber = bill.BillNumber,
                 billId = bill.Id,
+                subTotal = subTotal,
+                gstAmount = gstAmount,
                 total = totalBill,
                 items = itemsSummary,
                 customerName = dto.CustomerName,

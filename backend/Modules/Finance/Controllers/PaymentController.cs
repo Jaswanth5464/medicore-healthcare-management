@@ -25,22 +25,7 @@ namespace MediCore.API.Modules.Finance.Controllers
         [Authorize(Roles = "Patient,SuperAdmin")]
         public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest request)
         {
-            var bill = await _context.Bills.FindAsync(request.BillId);
-            if (bill == null)
-                return NotFound(new { success = false, message = "Bill not found" });
-
-            if (bill.Status == "Paid")
-                return BadRequest(new { success = false, message = "Bill is already paid" });
-
-            // Generate a Mock Razorpay Order ID
-            var orderId = $"order_Rmock_{Guid.NewGuid().ToString("N").Substring(0, 10)}";
-            
-            return Ok(new 
-            { 
-                success = true, 
-                orderId = orderId, 
-                amount = bill.TotalAmount * 100 // Razorpay expects paise/cents
-            });
+            return BadRequest(new { success = false, message = "Online payments are currently launching soon! Please pay at the hospital reception." });
         }
 
         // POST api/payment/verify
@@ -48,43 +33,7 @@ namespace MediCore.API.Modules.Finance.Controllers
         [Authorize(Roles = "Patient,SuperAdmin")]
         public async Task<IActionResult> VerifyPayment([FromBody] VerifyPaymentRequest request)
         {
-            var bill = await _context.Bills.FindAsync(request.BillId);
-            if (bill == null)
-                return NotFound(new { success = false, message = "Bill not found" });
-
-            // In a real app, you would verify the signature using RazorpayClient
-            
-            // Mark bill as Paid
-            bill.Status = "Paid";
-            bill.PaymentMode = "Online Payment";
-            bill.RazorpayOrderId = request.RazorpayOrderId;
-            bill.RazorpayPaymentId = request.RazorpayPaymentId;
-            bill.PaidAt = DateTime.UtcNow;
-            bill.UpdatedAt = DateTime.UtcNow;
-
-            // Mark associated appointment as Paid too
-            var appt = await _context.Appointments.FindAsync(bill.AppointmentId);
-            if (appt != null)
-            {
-                appt.PaymentStatus = "Paid";
-                appt.PaymentMode = "Online Payment";
-                appt.RazorpayPaymentId = request.RazorpayPaymentId;
-                appt.UpdatedAt = DateTime.UtcNow;
-            }
-
-            await _context.SaveChangesAsync();
-
-            // Real-time notification: Payment Received
-            var patientName = await _context.Users.Where(u => u.Id == bill.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
-            await _hubContext.Clients.Group("receptionist")
-                .SendAsync("PaymentReceived", new { 
-                    billId = bill.Id, 
-                    patientName = patientName, 
-                    amount = bill.TotalAmount,
-                    mode = bill.PaymentMode
-                });
-
-            return Ok(new { success = true, message = "Payment verified successfully" });
+            return BadRequest(new { success = false, message = "Payment verification is temporarily disabled as we prepare for launch." });
         }
     }
 

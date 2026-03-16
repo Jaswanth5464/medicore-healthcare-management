@@ -17,7 +17,10 @@ namespace MediCore.API.Services
         Task SendInvoiceAsync(string toEmail, string patientName, string billNumber, decimal amount, string date, string status);
         Task SendLabReportAsync(string toEmail, string patientName, string testType, string results, string date, string reportUrl);
         Task SendDailyDigestAsync(string adminEmail, string adminName, int totalPatients, decimal totalRevenue, int pendingAppts, int tomorrowCount, string dietPlanHtml = "");
+        Task SendFollowUpReminderAsync(string toEmail, string patientName, string doctorName, string followUpDateStr, string bookingUrl);
         Task SendAppointmentReminderAsync(string toEmail, string patientName, string doctorName, string department, string date, string time, string tokenNumber, decimal fee);
+        Task SendFeedbackRequestAsync(string toEmail, string patientName, string doctorName, string referenceNumber, bool isIPD = false);
+        Task SendEmailAsync(string[] toEmails, string subject, string body, bool isHtml = true);
     }
 
     public class EmailService : IEmailService
@@ -199,6 +202,10 @@ namespace MediCore.API.Services
 
       <div class='message' style='background:#f1f5f9; padding:16px; border-radius:8px; font-size:14px;'>
         <strong>Hospital Entry:</strong> Present this email or state your token number (<strong>{tokenNumber}</strong>) at the front desk. Please enter the premises 15 minutes before your time slot.
+      </div>
+
+      <div style='text-align:center; margin-top:32px;'>
+        <a href='{_config["FrontendUrl"]}/auth/login' style='display:inline-block; background:#10b981; color:white; padding:16px 32px; border-radius:12px; text-decoration:none; font-weight:700; font-size:16px; box-shadow:0 8px 20px rgba(16,185,129,0.3);'>Login to Patient Portal</a>
       </div>
 
       {_hospitalSignature}
@@ -516,6 +523,10 @@ namespace MediCore.API.Services
         📍 Get Directions to MediCore Hospital
       </a>
 
+      <div style='text-align:center; margin-top:24px; margin-bottom:32px;'>
+        <a href='{_config["FrontendUrl"]}/auth/login' style='color:#4f46e5; text-decoration:underline; font-weight:600; font-size:14px;'>Login to view appointment details</a>
+      </div>
+
       {_hospitalSignature}
     </div>
     <div class='footer'>
@@ -525,6 +536,104 @@ namespace MediCore.API.Services
   </div>
 </div>
 </body></html>";
+
+            await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task SendFeedbackRequestAsync(string toEmail, string patientName, string doctorName, string referenceNumber, bool isIPD = false)
+        {
+            var subject = $"How was your visit to MediCore Hospitals?";
+            var typeLabel = isIPD ? "stay" : "consultation";
+            
+            var body = $@"<!DOCTYPE html><html><head><meta charset='UTF-8'>
+<style>
+  body{{margin:0;padding:0;background:#f8fafc;font-family:'Segoe UI',Arial,sans-serif;}}
+  .wrap{{max-width:600px;margin:40px auto;}}
+  .card{{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08);border:1px solid #e2e8f0;}}
+  .hdr{{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:44px 40px;text-align:center;border-bottom:5px solid #3b82f6;}}
+  .hdr .icon{{font-size:48px;margin-bottom:16px;}}
+  .hdr h1{{color:#fff;margin:0;font-size:26px;font-weight:800;}}
+  .body{{padding:36px 40px;text-align:center;}}
+  .greeting{{font-size:18px;color:#1e293b;font-weight:600;margin-bottom:20px;}}
+  .message{{color:#475569;font-size:16px;line-height:1.7;margin-bottom:32px;}}
+  .action-btn{{display:inline-block;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;padding:16px 32px;border-radius:12px;font-weight:700;font-size:16px;box-shadow:0 8px 20px rgba(59,130,246,0.3);}}
+  .footer{{background:#f8fafc;padding:24px 40px;text-align:center;border-top:1px solid #f1f5f9;}}
+  .footer p{{margin:0;color:#94a3b8;font-size:12px;line-height:1.6;}}
+</style></head><body>
+<div class='wrap'>
+  <div class='card'>
+    <div class='hdr'>
+      <div class='icon'>🌟</div>
+      <h1>Your Opinion Matters</h1>
+    </div>
+    <div class='body'>
+      <div class='greeting'>Hello {patientName},</div>
+      <div class='message'>
+        Thank you for choosing MediCore Hospitals. We hope your recent {typeLabel} with <strong>Dr. {doctorName}</strong> was comfortable and that you're well on your way to recovery.
+        <br><br>
+        Could you take 60 seconds to share your experience with us? Your feedback helps us improve our care for everyone.
+      </div>
+
+      <a class='action-btn' href='{_config["FrontendUrl"]}/patient/feedback?ref={referenceNumber}'>
+        Share Your Feedback
+      </a>
+
+      <p style='margin-top:24px; color:#94a3b8; font-size:13px;'>Reference: {referenceNumber}</p>
+
+      {_hospitalSignature}
+    </div>
+    <div class='footer'>
+      <p>You received this email because you recently visited MediCore Hospitals.</p>
+      <p style='margin-top:8px;'>© 2026 MediCore Hospitals. All rights reserved.</p>
+    </div>
+  </div>
+</div>
+</body></html>";
+
+            await SendEmailAsync(toEmail, subject, body);
+        }
+
+
+        public async Task SendFollowUpReminderAsync(string toEmail, string patientName, string doctorName, string followUpDateStr, string bookingUrl)
+        {
+            var subject = $"Follow-up Reminder from MediCore \u2014 Dr. {doctorName}";
+
+            var body = $@"<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>
+<style>
+body{{margin:0;padding:0;background:#f8fafc;font-family:'Segoe UI',Roboto,sans-serif;}}
+.wrap{{width:100%;padding:32px 0;}}
+.card{{margin:0 auto;max-width:600px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.08);}}
+.hdr{{background:linear-gradient(135deg,#7c3aed,#4f46e5);padding:40px;text-align:center;color:#fff;}}
+.hdr h1{{margin:0;font-size:24px;font-weight:800;}}
+.hdr p{{margin:8px 0 0;color:#ddd6fe;font-size:14px;}}
+.body{{padding:36px 40px;}}
+.greeting{{color:#0f172a;font-size:19px;font-weight:600;margin-bottom:16px;}}
+.message{{color:#475569;font-size:15px;line-height:1.7;margin-bottom:24px;}}
+.info-box{{background:#f5f3ff;border:1px solid #c4b5fd;border-radius:12px;padding:20px 24px;margin-bottom:28px;}}
+.info-box p{{margin:0 0 8px;font-size:14px;font-weight:600;color:#5b21b6;}}
+.info-box p:last-child{{margin-bottom:0;}}
+.cta{{text-align:center;margin-bottom:24px;}}
+.cta-btn{{display:inline-block;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:15px;}}
+.footer{{background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #f1f5f9;}}
+.footer p{{margin:0;color:#94a3b8;font-size:12px;}}
+</style></head><body>
+<div class='wrap'><div class='card'>
+  <div class='hdr'>
+    <h1>Time for Your Follow-up</h1>
+    <p>Your doctor wants to check on your recovery</p>
+  </div>
+  <div class='body'>
+    <div class='greeting'>Hello {patientName},</div>
+    <div class='message'>Dr. <strong>{doctorName}</strong> has recommended a follow-up consultation. Please book your appointment to ensure continuity of care.</div>
+    <div class='info-box'>
+      <p>Recommended Date: <strong>{followUpDateStr}</strong></p>
+      <p>Doctor: <strong>Dr. {doctorName}</strong></p>
+    </div>
+    <div class='cta'><a class='cta-btn' href='{bookingUrl}'>Book Your Follow-up Now</a></div>
+    <div class='message' style='font-size:13px;color:#94a3b8;'>If you have already booked or no longer need a follow-up, please disregard this email.</div>
+  </div>
+  <div class='footer'><p>&copy; {DateTime.Now.Year} MediCore Hospitals &bull; Automated Health Reminder</p></div>
+</div></div></body></html>";
 
             await SendEmailAsync(toEmail, subject, body);
         }
@@ -560,6 +669,44 @@ namespace MediCore.API.Services
             };
 
             mailMessage.To.Add(toEmail);
+
+            await client.SendMailAsync(mailMessage);
+        }
+
+        public async Task SendEmailAsync(string[] toEmails, string subject, string body, bool isHtml = true)
+        {
+            var smtpHost = _config["Email:SmtpHost"];
+            var smtpPortStr = _config["Email:SmtpPort"];
+            var smtpUser = _config["Email:SmtpUser"];
+            var smtpPass = _config["Email:SmtpPass"];
+            var fromEmail = _config["Email:FromEmail"];
+            var fromName = _config["Email:FromName"] ?? "MediCore Hospital";
+
+            if (string.IsNullOrEmpty(smtpHost) || string.IsNullOrEmpty(smtpPortStr) || string.IsNullOrEmpty(smtpUser))
+            {
+                Console.WriteLine("Warning: SMTP configuration is missing. Cannot send generic email.");
+                return;
+            }
+
+            int smtpPort = int.Parse(smtpPortStr);
+            using var client = new SmtpClient(smtpHost, smtpPort)
+            {
+                Credentials = new NetworkCredential(smtpUser, smtpPass),
+                EnableSsl = true,
+            };
+
+            var mailMessage = new MailMessage
+            {
+                From = new MailAddress(fromEmail ?? "noreply@medicore.com", fromName),
+                Subject = subject,
+                Body = body,
+                IsBodyHtml = isHtml
+            };
+
+            foreach (var email in toEmails)
+            {
+                mailMessage.To.Add(email);
+            }
 
             await client.SendMailAsync(mailMessage);
         }

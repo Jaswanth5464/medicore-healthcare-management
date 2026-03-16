@@ -107,68 +107,6 @@ namespace MediCore.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Roles");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Description = "Full system access",
-                            Name = "SuperAdmin"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Description = "Hospital management access",
-                            Name = "HospitalAdmin"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Description = "Front desk operations",
-                            Name = "Receptionist"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Description = "Medical consultation access",
-                            Name = "Doctor"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Description = "Ward management access",
-                            Name = "Nurse"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Description = "Pharmacy management access",
-                            Name = "Pharmacist"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Description = "Laboratory access",
-                            Name = "LabTechnician"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Description = "Billing and finance access",
-                            Name = "FinanceStaff"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Description = "Patient mentoring access",
-                            Name = "Mentor"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Description = "Patient portal access",
-                            Name = "Patient"
-                        });
                 });
 
             modelBuilder.Entity("MediCore.API.Modules.Auth.Models.User", b =>
@@ -219,6 +157,450 @@ namespace MediCore.API.Migrations
                     b.HasIndex("RoleId");
 
                     b.ToTable("UserRoles");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.BedAllocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BedNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CurrentAdmissionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FloorNumber")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastCleanedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MaintenanceNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RoomId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoomTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrentAdmissionId")
+                        .IsUnique()
+                        .HasFilter("[CurrentAdmissionId] IS NOT NULL");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("RoomTypeId");
+
+                    b.ToTable("BedAllocations");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.DailyIPDCharge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AddedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AdmissionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ChargeDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DoctorVisitCharge")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("LabCharge")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MedicineCharge")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("NursingCharge")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("OtherCharges")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ProcedureCharge")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("RoomCharge")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddedByUserId");
+
+                    b.HasIndex("AdmissionId");
+
+                    b.ToTable("DailyIPDCharges");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.DischargeNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActivityRestrictions")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("AdmissionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Complications")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DietInstructions")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DischargeType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DoctorNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FinalDiagnosis")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("FollowUpDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FollowUpWithDoctorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MedicinesAtDischarge")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TreatmentSummary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId")
+                        .IsUnique();
+
+                    b.HasIndex("FollowUpWithDoctorId");
+
+                    b.ToTable("DischargeNotes");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.PatientAdmission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ActualDischargeDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("AdmissionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AdmissionNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AdmissionType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("AdmittingDoctorProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AttendantName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AttendantPhone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AttendantRelation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("BedId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ChiefComplaints")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DailyRoomCharge")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DischargedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ExpectedDischargeDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("FeedbackEmailSent")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("FinalDiagnosis")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("InitialDiagnosis")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PatientUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoomId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoomTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmittingDoctorProfileId");
+
+                    b.HasIndex("BedId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("DischargedByUserId");
+
+                    b.HasIndex("PatientUserId");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("RoomTypeId");
+
+                    b.ToTable("PatientAdmissions");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.Room", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("FloorNumber")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RoomName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RoomNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RoomTypeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoomTypeId");
+
+                    b.ToTable("Rooms");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.RoomType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Amenities")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("BedsPerRoom")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ColorCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("FloorNumber")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("PricePerDay")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RoomTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Amenities = "Basic bed, monitor, oxygen",
+                            BedsPerRoom = 1,
+                            ColorCode = "#ef4444",
+                            Description = "Emergency care with basic monitoring",
+                            FloorNumber = 0,
+                            IsActive = true,
+                            Name = "Emergency Ward",
+                            PricePerDay = 2000m
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Amenities = "ICU equipment, ventilator, advanced monitoring",
+                            BedsPerRoom = 1,
+                            ColorCode = "#dc2626",
+                            Description = "Intensive Care Unit with advanced equipment",
+                            FloorNumber = 0,
+                            IsActive = true,
+                            Name = "ICU",
+                            PricePerDay = 8000m
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Amenities = "Neonatal equipment, incubator, advanced care",
+                            BedsPerRoom = 1,
+                            ColorCode = "#f97316",
+                            Description = "Neonatal Intensive Care Unit",
+                            FloorNumber = 0,
+                            IsActive = true,
+                            Name = "NICU",
+                            PricePerDay = 10000m
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Amenities = "Basic amenities, bed, locker",
+                            BedsPerRoom = 1,
+                            ColorCode = "#3b82f6",
+                            Description = "General male ward",
+                            FloorNumber = 1,
+                            IsActive = true,
+                            Name = "General Ward Male",
+                            PricePerDay = 1200m
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Amenities = "Basic amenities, bed, locker",
+                            BedsPerRoom = 1,
+                            ColorCode = "#8b5cf6",
+                            Description = "General female ward",
+                            FloorNumber = 1,
+                            IsActive = true,
+                            Name = "General Ward Female",
+                            PricePerDay = 1200m
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Amenities = "AC, TV, shared bathroom",
+                            BedsPerRoom = 2,
+                            ColorCode = "#6366f1",
+                            Description = "Semi-private accommodation",
+                            FloorNumber = 2,
+                            IsActive = true,
+                            Name = "Semi-Private Room",
+                            PricePerDay = 2500m
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Amenities = "AC, TV, refrigerator, sofa",
+                            BedsPerRoom = 1,
+                            ColorCode = "#22c55e",
+                            Description = "Private accommodation",
+                            FloorNumber = 3,
+                            IsActive = true,
+                            Name = "Private Room",
+                            PricePerDay = 4500m
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Amenities = "AC, TV, refrigerator, sofa, attendant bed",
+                            BedsPerRoom = 1,
+                            ColorCode = "#10b981",
+                            Description = "Deluxe private accommodation",
+                            FloorNumber = 3,
+                            IsActive = true,
+                            Name = "Deluxe Room",
+                            PricePerDay = 7000m
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Amenities = "Full suite, living area, kitchenette",
+                            BedsPerRoom = 1,
+                            ColorCode = "#0d9488",
+                            Description = "Full suite with living area",
+                            FloorNumber = 4,
+                            IsActive = true,
+                            Name = "Suite",
+                            PricePerDay = 12000m
+                        });
                 });
 
             modelBuilder.Entity("MediCore.API.Modules.Communication.Models.ChatMessage", b =>
@@ -444,6 +826,42 @@ namespace MediCore.API.Migrations
                     b.ToTable("Bills");
                 });
 
+            modelBuilder.Entity("MediCore.API.Modules.Finance.Models.Expense", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ExpenseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Expenses");
+                });
+
             modelBuilder.Entity("MediCore.API.Modules.Laboratory.Models.LabOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -577,7 +995,28 @@ namespace MediCore.API.Migrations
                     b.Property<int>("DoctorProfileId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("FeedbackEmailSent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("FeedbackSubmitted")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("FollowUpAppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("FollowUpBooked")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("FollowUpDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("FollowUpReminderSent")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsFirstVisit")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVideoConsultation")
                         .HasColumnType("bit");
 
                     b.Property<int>("PatientUserId")
@@ -618,6 +1057,18 @@ namespace MediCore.API.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("VideoEndedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("VideoJoinedByPatientAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VideoRoomUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("VideoStartedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("VisitType")
@@ -876,7 +1327,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6347),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6271),
                             Description = "General health consultations",
                             FloorNumber = 1,
                             Icon = "🏥",
@@ -886,7 +1337,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 2,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6353),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6277),
                             Description = "Heart care",
                             FloorNumber = 2,
                             Icon = "❤️",
@@ -896,7 +1347,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 3,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6355),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6280),
                             Description = "Brain care",
                             FloorNumber = 2,
                             Icon = "🧠",
@@ -906,7 +1357,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 4,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6356),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6281),
                             Description = "Bone care",
                             FloorNumber = 3,
                             Icon = "🦴",
@@ -916,7 +1367,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 5,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6358),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6282),
                             Description = "Children care",
                             FloorNumber = 1,
                             Icon = "👶",
@@ -926,7 +1377,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 6,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6359),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6284),
                             Description = "Women health",
                             FloorNumber = 4,
                             Icon = "🌸",
@@ -936,7 +1387,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 7,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6361),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6285),
                             Description = "Skin care",
                             FloorNumber = 2,
                             Icon = "✨",
@@ -946,7 +1397,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 8,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6363),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6286),
                             Description = "Eye care",
                             FloorNumber = 1,
                             Icon = "👁️",
@@ -956,7 +1407,7 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 9,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6365),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6287),
                             Description = "Ear nose throat",
                             FloorNumber = 3,
                             Icon = "👂",
@@ -966,13 +1417,65 @@ namespace MediCore.API.Migrations
                         new
                         {
                             Id = 10,
-                            CreatedAt = new DateTime(2026, 3, 15, 16, 29, 19, 272, DateTimeKind.Utc).AddTicks(6367),
+                            CreatedAt = new DateTime(2026, 3, 15, 20, 0, 39, 489, DateTimeKind.Utc).AddTicks(6289),
                             Description = "Mental health",
                             FloorNumber = 4,
                             Icon = "🧘",
                             IsActive = true,
                             Name = "Psychiatry"
                         });
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Patient.Models.PatientFeedback", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DoctorProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DoctorRating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FacilityRating")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsAnonymous")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("OverallRating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PatientUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StaffRating")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("WouldRecommend")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("DoctorProfileId");
+
+                    b.HasIndex("PatientUserId");
+
+                    b.ToTable("PatientFeedbacks");
                 });
 
             modelBuilder.Entity("MediCore.API.Modules.Patient.Models.PatientProfile", b =>
@@ -1094,6 +1597,137 @@ namespace MediCore.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.BedAllocation", b =>
+                {
+                    b.HasOne("MediCore.API.Modules.Bed.Models.PatientAdmission", "CurrentAdmission")
+                        .WithOne()
+                        .HasForeignKey("MediCore.API.Modules.Bed.Models.BedAllocation", "CurrentAdmissionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MediCore.API.Modules.Bed.Models.Room", "Room")
+                        .WithMany("Beds")
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Bed.Models.RoomType", "RoomType")
+                        .WithMany()
+                        .HasForeignKey("RoomTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CurrentAdmission");
+
+                    b.Navigation("Room");
+
+                    b.Navigation("RoomType");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.DailyIPDCharge", b =>
+                {
+                    b.HasOne("MediCore.API.Modules.Auth.Models.User", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Bed.Models.PatientAdmission", "Admission")
+                        .WithMany("DailyCharges")
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("Admission");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.DischargeNote", b =>
+                {
+                    b.HasOne("MediCore.API.Modules.Bed.Models.PatientAdmission", "Admission")
+                        .WithOne("DischargeNote")
+                        .HasForeignKey("MediCore.API.Modules.Bed.Models.DischargeNote", "AdmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Doctor.Models.DoctorProfile", "FollowUpDoctor")
+                        .WithMany()
+                        .HasForeignKey("FollowUpWithDoctorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("FollowUpDoctor");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.PatientAdmission", b =>
+                {
+                    b.HasOne("MediCore.API.Modules.Doctor.Models.DoctorProfile", "AdmittingDoctor")
+                        .WithMany()
+                        .HasForeignKey("AdmittingDoctorProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Bed.Models.BedAllocation", "Bed")
+                        .WithMany("AllAdmissions")
+                        .HasForeignKey("BedId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MediCore.API.Modules.Patient.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Auth.Models.User", "DischargedByUser")
+                        .WithMany()
+                        .HasForeignKey("DischargedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MediCore.API.Modules.Auth.Models.User", "PatientUser")
+                        .WithMany()
+                        .HasForeignKey("PatientUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Bed.Models.Room", "Room")
+                        .WithMany("PatientAdmissions")
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Bed.Models.RoomType", "RoomType")
+                        .WithMany()
+                        .HasForeignKey("RoomTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AdmittingDoctor");
+
+                    b.Navigation("Bed");
+
+                    b.Navigation("Department");
+
+                    b.Navigation("DischargedByUser");
+
+                    b.Navigation("PatientUser");
+
+                    b.Navigation("Room");
+
+                    b.Navigation("RoomType");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.Room", b =>
+                {
+                    b.HasOne("MediCore.API.Modules.Bed.Models.RoomType", "RoomType")
+                        .WithMany()
+                        .HasForeignKey("RoomTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RoomType");
+                });
+
             modelBuilder.Entity("MediCore.API.Modules.Doctor.Models.DoctorLeave", b =>
                 {
                     b.HasOne("MediCore.API.Modules.Doctor.Models.DoctorProfile", "DoctorProfile")
@@ -1182,6 +1816,33 @@ namespace MediCore.API.Migrations
                     b.Navigation("Appointment");
                 });
 
+            modelBuilder.Entity("MediCore.API.Modules.Patient.Models.PatientFeedback", b =>
+                {
+                    b.HasOne("MediCore.API.Modules.OPD.Models.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Doctor.Models.DoctorProfile", "DoctorProfile")
+                        .WithMany()
+                        .HasForeignKey("DoctorProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MediCore.API.Modules.Auth.Models.User", "PatientUser")
+                        .WithMany()
+                        .HasForeignKey("PatientUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Appointment");
+
+                    b.Navigation("DoctorProfile");
+
+                    b.Navigation("PatientUser");
+                });
+
             modelBuilder.Entity("MediCore.API.Modules.Patient.Models.PatientProfile", b =>
                 {
                     b.HasOne("MediCore.API.Modules.Auth.Models.User", "User")
@@ -1203,6 +1864,25 @@ namespace MediCore.API.Migrations
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.BedAllocation", b =>
+                {
+                    b.Navigation("AllAdmissions");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.PatientAdmission", b =>
+                {
+                    b.Navigation("DailyCharges");
+
+                    b.Navigation("DischargeNote");
+                });
+
+            modelBuilder.Entity("MediCore.API.Modules.Bed.Models.Room", b =>
+                {
+                    b.Navigation("Beds");
+
+                    b.Navigation("PatientAdmissions");
                 });
 
             modelBuilder.Entity("MediCore.API.Modules.Patient.Models.Department", b =>

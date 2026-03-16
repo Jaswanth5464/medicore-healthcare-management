@@ -10,15 +10,27 @@ import { ConfigService } from '../../../core/services/config.service';
 import { HospitalChatComponent } from '../../communication/chat/hospital-chat.component';
 import { PatientDoctorChatComponent } from '../../communication/chat/patient-doctor-chat.component';
 import { SignalRService } from '../../../core/services/signalr.service';
+import { VideoCallComponent } from '../../communication/video/video-call.component';
 
 // const BASE_URL = 'https://localhost:7113';
 
 @Component({
   selector: 'app-doctor-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, AppointmentCalendarComponent, HospitalChatComponent, PatientDoctorChatComponent],
+  imports: [CommonModule, FormsModule, AppointmentCalendarComponent, HospitalChatComponent, PatientDoctorChatComponent, VideoCallComponent],
   template: `
     <div class="doctor-dash">
+      <!-- Video Consultation Overlay -->
+      <div class="video-overlay" *ngIf="activeVideoRoom()">
+        <div class="video-modal-content">
+          <app-video-call 
+            [roomName]="activeVideoRoom().roomName" 
+            [userName]="'Dr. ' + auth.currentUser()?.fullName"
+            [isDoctor]="true"
+            (onEndCall)="closeVideoCall()">
+          </app-video-call>
+        </div>
+      </div>
       <div class="header">
         <div class="header-left">
           <div class="avatar">{{ myProfile()?.specialization?.[0] || 'D' }}</div>
@@ -106,8 +118,14 @@ import { SignalRService } from '../../../core/services/signalr.service';
             <div class="consult-header">
               <div style="display:flex; align-items:center; gap:16px;">
                 <h2>Consultation — {{ consultationPatientName() }}</h2>
+                <div class="video-badge" *ngIf="consultationData()?.isVideoConsultation">
+                  📹 Video Consultation
+                </div>
                 <button class="small-btn pulse" (click)="activePatientChat.set({id: activePatientUserId, name: consultationPatientName()})">
                   💬 Chat with Patient
+                </button>
+                <button class="primary-btn pulse-video" *ngIf="consultationData()?.isVideoConsultation" (click)="startVideoCall()">
+                  Start Video Call
                 </button>
               </div>
               <span class="patient-id">Appt ID: #{{ activeAppointmentId() }}</span>
@@ -242,6 +260,7 @@ import { SignalRService } from '../../../core/services/signalr.service';
                         <option value="Soft Food - Mashed vegetables, curd rice, and soft fruits.">Soft Food</option>
                       </select>
                     </div>
+                    <div class="input-group"><label>Follow-up Date Recommendation</label><input type="date" [(ngModel)]="prescription.followUpDate" [min]="minDate()"></div>
                   </div>
                   <div style="margin-top:16px; text-align:right; display:flex; justify-content:flex-end; gap:8px;">
                     <button class="primary-btn" (click)="savePrescription()" [disabled]="prescSaved()">
@@ -433,6 +452,30 @@ import { SignalRService } from '../../../core/services/signalr.service';
     .chat-main { flex: 1; display: flex; flex-direction: column; background: #f8fafc; }
     .no-selection { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; }
     .no-selection .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+
+    .video-badge { background: #fee2e2; color: #ef4444; padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 6px; border: 1px solid #fecaca; }
+    .pulse-video { background: #ef4444 !important; animation: pulse-red 2s infinite; }
+    @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+
+    .video-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.9);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .video-modal-content {
+      width: 100%;
+      height: 100%;
+      max-width: 1400px;
+      max-height: 800px;
+    }
   `]
 })
 export class DoctorDashboardComponent implements OnInit {
@@ -448,6 +491,7 @@ export class DoctorDashboardComponent implements OnInit {
   myProfile = signal<any>(null);
   loadingProfile = signal(true);
   myLeaves = signal<any[]>([]);
+  activeVideoRoom = signal<any>(null);
 
   // Patient Chat Tab State
   chatPartners = signal<any[]>([]);
@@ -461,7 +505,7 @@ export class DoctorDashboardComponent implements OnInit {
 
   vitals = { bloodPressure: '', heartRateBpm: null, temperatureFahrenheit: null, weightKg: null, spO2: null };
   lab = { testType: 'Blood Test', notes: '' };
-  prescription: any = { diagnosis: '', medicinesJson: '[]', advice: '', dietPlan: '' };
+  prescription: any = { diagnosis: '', medicinesJson: '[]', advice: '', dietPlan: '', followUpDate: '' };
 
   // New Prescription State
   inventory = signal<any[]>([]);
@@ -525,7 +569,7 @@ export class DoctorDashboardComponent implements OnInit {
     });
   }
 
-  startConsultation(event: { appointmentId: number, patientName: string, patientUserId?: string }) {
+  startConsultation(event: { appointmentId: number, patientName: string, patientUserId?: string, isVideoConsultation?: boolean }) {
     this.activeAppointmentId.set(event.appointmentId);
     this.consultationPatientName.set(event.patientName);
     this.activePatientUserId = event.patientUserId || null;
@@ -538,6 +582,7 @@ export class DoctorDashboardComponent implements OnInit {
     this.vitalsSaved.set(false);
     this.prescSaved.set(false);
     this.savedLabs.set([]);
+    this.consultationData.set({ isVideoConsultation: event.isVideoConsultation });
 
     // Optional: fetch existing consultation data
     this.http.get<any>(`${this.BASE_URL}/api/consultation/${event.appointmentId}`, { headers: this.getHeaders() })
@@ -564,6 +609,32 @@ export class DoctorDashboardComponent implements OnInit {
 
     // Auto mark status as "WithDoctor"
     this.state.updateStatus(event.appointmentId, 'WithDoctor', this.getHeaders());
+  }
+
+  startVideoCall() {
+    const apptId = this.activeAppointmentId();
+    if (!apptId) return;
+
+    this.http.post<any>(`${this.BASE_URL}/api/appointments/${apptId}/start-video`, {}, { headers: this.getHeaders() })
+      .subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.notify.success('Patient notified. Joining room...');
+            // Extract room name from URL: https://meet.jit.si/MediCore-Appt-1-abcd -> MediCore-Appt-1-abcd
+            const roomName = res.videoUrl.split('/').pop();
+            this.activeVideoRoom.set({ roomName });
+          }
+        },
+        error: (err) => this.notify.error(err.error?.message || 'Failed to start video call')
+      });
+  }
+
+  closeVideoCall() {
+    const apptId = this.activeAppointmentId();
+    if (apptId) {
+      this.http.post(`${this.BASE_URL}/api/appointments/${apptId}/end-video`, {}, { headers: this.getHeaders() }).subscribe();
+    }
+    this.activeVideoRoom.set(null);
   }
 
   saveVitals() {
@@ -702,10 +773,15 @@ export class DoctorDashboardComponent implements OnInit {
   }
 
   markCompleted() {
-    if (confirm('Mark this appointment as Completed? This will auto-generate the patient bill.')) {
-      this.state.updateStatus(this.activeAppointmentId()!, 'Completed', this.getHeaders());
+    const fup = this.prescription.followUpDate || null;
+    if (confirm(`Mark this appointment as Completed? ${fup ? 'Follow-up recommended for ' + fup : ''}`)) {
+      this.state.updateStatus(this.activeAppointmentId()!, 'Completed', this.getHeaders(), fup);
       this.endConsultation();
     }
+  }
+
+  minDate() {
+    return new Date().toISOString().split('T')[0];
   }
 
   loadLeaves() {

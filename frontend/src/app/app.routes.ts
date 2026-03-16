@@ -110,6 +110,14 @@ export const routes: Routes = [
             (m) => m.FinanceDashboardComponent
           ),
       },
+      {
+        path: 'ipd',
+        canActivate: [roleGuard(['SuperAdmin', 'HospitalAdmin', 'Receptionist'])],
+        loadComponent: () =>
+          import('./modules/dashboard/ipd/bed-allocation.component').then(
+            (m) => m.BedAllocationComponent
+          ),
+      },
       { path: '', redirectTo: 'admin', pathMatch: 'full' },
     ],
   },

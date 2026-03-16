@@ -48,6 +48,21 @@ namespace MediCore.API.Modules.OPD.Models
         public DateTime? CompletedAt { get; set; }
         public int QueuePosition { get; set; } = 0;
 
+        // Feature 4: Video Consultation
+        public bool IsVideoConsultation { get; set; } = false;
+        public string? VideoRoomUrl { get; set; }
+        public DateTime? VideoStartedAt { get; set; }
+        public DateTime? VideoEndedAt { get; set; }
+        public DateTime? VideoJoinedByPatientAt { get; set; }
+
+        // Feature 5 & 7: Feedback and Follow-up
+        public bool FeedbackEmailSent { get; set; } = false;
+        public bool FeedbackSubmitted { get; set; } = false;
+        public DateTime? FollowUpDate { get; set; }
+        public bool FollowUpReminderSent { get; set; } = false;
+        public bool FollowUpBooked { get; set; } = false;
+        public int? FollowUpAppointmentId { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
         public Department Department { get; set; } = null!;

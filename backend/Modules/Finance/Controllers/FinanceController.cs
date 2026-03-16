@@ -1,4 +1,5 @@
 using MediCore.API.Infrastructure.Database.Context;
+using MediCore.API.Modules.Finance.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -115,6 +116,33 @@ namespace MediCore.API.Modules.Finance.Controllers
             return Ok(new { success = true, message = "Invoice sent successfully" });
         }
 
+        [HttpGet("expenses")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff")]
+        public async Task<IActionResult> GetExpenses()
+        {
+            var expenses = await _context.Expenses
+                .OrderByDescending(e => e.ExpenseDate)
+                .Take(500)
+                .ToListAsync();
+            return Ok(new { success = true, data = expenses });
+        }
+
+        [HttpPost("expenses")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff")]
+        public async Task<IActionResult> AddExpense([FromBody] Expense expense)
+        {
+            var userIdStr = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdStr, out var userId))
+            {
+                expense.CreatedByUserId = userId;
+            }
+            
+            expense.CreatedAt = DateTime.UtcNow;
+            _context.Expenses.Add(expense);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, data = expense });
+        }
+
         public class UpdateStatusDto
         {
             public string Status { get; set; } = string.Empty;
@@ -144,6 +172,107 @@ namespace MediCore.API.Modules.Finance.Controllers
                 .ToListAsync();
 
             return Ok(new { success = true, data = logs });
+        }
+
+        [HttpGet("stats")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff")]
+        public async Task<IActionResult> GetFinanceStats()
+        {
+            var today = DateTime.UtcNow.Date;
+            var monthStart = new DateTime(today.Year, today.Month, 1);
+
+            var todayRevenue = await _context.Bills
+                .Where(b => (b.PaidAt != null && b.PaidAt.Value.Date == today) || (b.PaidAt == null && b.CreatedAt.Date == today && b.Status == "Paid"))
+                .SumAsync(b => b.TotalAmount);
+
+            var yesterday = today.AddDays(-1);
+            var yesterdayRevenue = await _context.Bills
+                .Where(b => (b.PaidAt != null && b.PaidAt.Value.Date == yesterday) || (b.PaidAt == null && b.CreatedAt.Date == yesterday && b.Status == "Paid"))
+                .SumAsync(b => b.TotalAmount);
+
+            var monthRevenue = await _context.Bills
+                .Where(b => (b.PaidAt != null && b.PaidAt.Value >= monthStart) || (b.PaidAt == null && b.CreatedAt >= monthStart && b.Status == "Paid"))
+                .SumAsync(b => b.TotalAmount);
+
+            var pendingAmount = await _context.Bills
+                .Where(b => b.Status == "Unpaid")
+                .SumAsync(b => b.TotalAmount);
+
+            var pendingCount = await _context.Bills
+                .CountAsync(b => b.Status == "Unpaid");
+
+            var totalBilledPatients = await _context.Bills
+                .Select(b => b.PatientUserId)
+                .Distinct()
+                .CountAsync();
+
+            var opdBilled = await _context.Bills.CountAsync(b => b.BillSource == "OPD" || b.BillSource == "OPD_CONSULTATION");
+            var ipdBilled = await _context.Bills.CountAsync(b => b.BillSource == "IPD" || b.BillSource == "Bed_Allocation");
+
+            // Dept wise stats
+            var depts = await _context.Departments.ToListAsync();
+            var deptStats = new List<object>();
+
+            foreach(var dept in depts)
+            {
+                var bills = await _context.Bills
+                    .Include(b => b.Appointment)
+                    .Where(b => b.DoctorProfileId != null && _context.DoctorProfiles.Any(d => d.Id == b.DoctorProfileId && d.DepartmentId == dept.Id))
+                    .ToListAsync();
+
+                deptStats.Add(new {
+                    Name = dept.Name,
+                    OPDPatients = bills.Count(b => b.BillSource != "IPD"),
+                    IPDPatients = bills.Count(b => b.BillSource == "IPD"),
+                    OPDRevenue = bills.Where(b => b.BillSource != "IPD").Sum(b => b.TotalAmount),
+                    IPDRevenue = bills.Where(b => b.BillSource == "IPD").Sum(b => b.TotalAmount),
+                    Total = bills.Sum(b => b.TotalAmount)
+                });
+            }
+
+            // IPD Metrics
+            var totalBeds = await _context.BedAllocations.CountAsync();
+            var occupiedBeds = await _context.BedAllocations.CountAsync(b => b.IsOccupied);
+            var ipdRevenueToday = await _context.Bills.Where(b => b.BillSource == "IPD" && b.CreatedAt.Date == today).SumAsync(b => b.TotalAmount);
+
+            // Expenses
+            var totalExpenses = await _context.Expenses.SumAsync(e => e.Amount);
+            var monthExpenses = await _context.Expenses.Where(e => e.ExpenseDate >= monthStart).SumAsync(e => e.Amount);
+            
+            // Revenue Source Breakdown
+            var pharmacyRevenue = await _context.Bills.Where(b => b.BillSource == "Pharmacy" && b.Status == "Paid").SumAsync(b => b.TotalAmount);
+            var labRevenue = await _context.Bills.Where(b => b.BillSource == "Laboratory" && b.Status == "Paid").SumAsync(b => b.TotalAmount);
+            var opdRevenue = await _context.Bills.Where(b => (b.BillSource == "OPD" || b.BillSource == "OPD_CONSULTATION") && b.Status == "Paid").SumAsync(b => b.TotalAmount);
+            var ipdRevenueTotal = await _context.Bills.Where(b => b.BillSource == "IPD" && b.Status == "Paid").SumAsync(b => b.TotalAmount);
+
+            return Ok(new {
+                success = true,
+                data = new {
+                    todayRevenue,
+                    yesterdayRevenue,
+                    monthRevenue,
+                    pendingAmount,
+                    pendingCount,
+                    totalBilledPatients,
+                    opdBilled,
+                    ipdBilled,
+                    deptStats,
+                    totalExpenses,
+                    monthExpenses,
+                    netProfit = monthRevenue - monthExpenses,
+                    revenueBreakdown = new {
+                        Pharmacy = pharmacyRevenue,
+                        Laboratory = labRevenue,
+                        OPD = opdRevenue,
+                        IPD = ipdRevenueTotal
+                    },
+                    ipdMetrics = new {
+                        totalBeds,
+                        occupiedBeds,
+                        ipdRevenueToday
+                    }
+                }
+            });
         }
     }
 }

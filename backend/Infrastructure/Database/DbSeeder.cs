@@ -154,6 +154,8 @@ namespace MediCore.API.Infrastructure.Database
             var depts = await context.Departments.ToListAsync();
             if (depts.Any() && !await context.Users.AnyAsync(u => u.UserRoles.Any(ur => ur.RoleId == 4)))
             {
+                var doctorNames = new[] { "Dr. Rajesh Khanna", "Dr. Shalini Singh", "Dr. Amit Verma", "Dr. Priya Reddy", "Dr. Vikram Seth" };
+                var specializations = new[] { "Cardiology", "Neurology", "General Medicine", "Pediatrics", "Orthopedics" };
 
                 for (int i = 0; i < doctorNames.Length; i++)
                 {

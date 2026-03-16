@@ -499,10 +499,12 @@ export class BedAllocationComponent implements OnInit {
   patients = signal<any[]>([]);
   departments = signal<any[]>([]);
   doctors = signal<any[]>([]);
+  selectedDeptId = signal<number | null>(null);
+
   filteredDoctors = computed(() => {
-    const deptId = this.admissionForm.get('departmentId')?.value;
+    const deptId = this.selectedDeptId();
     if (!deptId) return [];
-    return this.doctors().filter(d => d.departmentId === +deptId);
+    return this.doctors().filter(d => d.departmentId === deptId);
   });
 
   admissionForm = this.fb.group({
@@ -591,6 +593,7 @@ export class BedAllocationComponent implements OnInit {
     this.showDrawer.set(true);
     
     if (bed.status === 'Available') {
+      this.selectedDeptId.set(null);
       this.admissionForm.reset({
         admissionType: 'Regular',
         patientUserId: '',
@@ -603,6 +606,8 @@ export class BedAllocationComponent implements OnInit {
   }
 
   onDeptChange() {
+    const val = this.admissionForm.get('departmentId')?.value;
+    this.selectedDeptId.set(val ? +val : null);
     this.admissionForm.get('admittingDoctorProfileId')?.setValue('');
   }
 

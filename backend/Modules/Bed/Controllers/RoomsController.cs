@@ -4,6 +4,9 @@ using MediCore.API.Modules.Bed.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MediCore.API.Modules.Auth.Models;
+using MediCore.API.Modules.Doctor.Models;
+using MediCore.API.Modules.Patient.Models;
 
 namespace MediCore.API.Modules.Bed.Controllers
 {
@@ -283,14 +286,56 @@ namespace MediCore.API.Modules.Bed.Controllers
                     .ToListAsync();
                 foreach (var p in patients) p.IsActive = true;
 
+                // 4. Ensure every department has at least one doctor
+                int extraDoctors = 0;
+                var doctorRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Doctor");
+                int docRoleId = doctorRole?.Id ?? 4; // Fallback to 4 as per seeder
+
+                foreach (var dept in depts)
+                {
+                    var hasDoc = await _context.DoctorProfiles.AnyAsync(d => d.DepartmentId == dept.Id);
+                    if (!hasDoc)
+                    {
+                        var user = new User
+                        {
+                            FullName = $"Dr. {dept.Name} Specialist",
+                            Email = $"{dept.Name.Replace(" ", "").ToLower()}.specialist@medicore.com",
+                            PhoneNumber = $"999000{dept.Id:D4}",
+                            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Pass@123"),
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UserRoles = new List<UserRole> { new UserRole { RoleId = docRoleId } }
+                        };
+                        _context.Users.Add(user);
+                        await _context.SaveChangesAsync();
+
+                        var profile = new DoctorProfile
+                        {
+                            UserId = user.Id,
+                            DepartmentId = dept.Id,
+                            Specialization = dept.Name,
+                            Qualification = "MD, MBBS",
+                            ExperienceYears = 12,
+                            ConsultationFee = 600,
+                            AvailableDays = "Mon,Tue,Wed,Thu,Fri,Sat",
+                            MorningStart = new TimeSpan(9, 0, 0),
+                            MorningEnd = new TimeSpan(13, 0, 0),
+                            IsActive = true
+                        };
+                        _context.DoctorProfiles.Add(profile);
+                        extraDoctors++;
+                    }
+                }
+
                 await _context.SaveChangesAsync();
 
                 return Ok(new { 
                     success = true, 
-                    message = "Data repair completed.", 
+                    message = "Data repair completed. Ensured all departments have doctors.", 
                     details = new {
                         departmentsFixed = depts.Count,
                         doctorsFixed = doctors.Count,
+                        extraDoctorsCreated = extraDoctors,
                         patientsFixed = patients.Count
                     }
                 });

@@ -38,6 +38,7 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1",
         Description = "Enterprise Hospital Management System API"
     });
+    c.CustomSchemaIds(x => x.FullName);
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -120,10 +121,9 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
 // Background Hosted Services
-// Automation services removed as requested
-// builder.Services.AddHostedService<FeedbackEmailService>();
-// builder.Services.AddHostedService<DailyDigestService>();
-// builder.Services.AddHostedService<FollowUpReminderService>();
+builder.Services.AddHostedService<FeedbackEmailService>();
+builder.Services.AddHostedService<DailyDigestService>();
+builder.Services.AddHostedService<FollowUpReminderService>();
 
 
 
@@ -162,32 +162,23 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<MediCoreHub>("/hubs/medicore");
 
-try
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
+    var db = scope.ServiceProvider.GetRequiredService<MediCoreDbContext>();
+    // --- Auto-apply migrations (Creates tables in RDS if they don't exist) ---
+    try
     {
-        var db = scope.ServiceProvider.GetRequiredService<MediCoreDbContext>();
+        Log.Information("Applying database migrations...");
+        await db.Database.MigrateAsync();
         
-        // --- Auto-fix production database schema for Walk-in sales ---
-        db.Database.ExecuteSqlRaw(@"
-            IF COL_LENGTH('Bills', 'BillSource') IS NULL 
-            BEGIN
-                ALTER TABLE Bills ADD BillSource nvarchar(max) NOT NULL DEFAULT 'OPD';
-                ALTER TABLE Bills ALTER COLUMN PatientUserId int NULL;
-                ALTER TABLE Bills ALTER COLUMN DoctorProfileId int NULL;
-                ALTER TABLE Bills ALTER COLUMN AppointmentId int NULL;
-                IF COL_LENGTH('Bills', 'SourceReferenceId') IS NULL 
-                    ALTER TABLE Bills ADD SourceReferenceId int NULL;
-            END
-        ");
-
-        // Call the central Seeder to populate initial data (Medicines, Lab Tests, Doctors, etc.)
+        // Call the central Seeder to populate initial data
         await MediCore.API.Infrastructure.Database.DbSeeder.SeedAsync(db);
+        Log.Information("Database initialization completed successfully.");
     }
-}
-catch (Exception ex)
-{
-    Log.Error(ex, "An error occurred during database migration/seeding on startup.");
+    catch (Exception ex)
+    {
+        Log.Error(ex, "An error occurred during database migration/seeding.");
+    }
 }
 
 app.Run();

@@ -150,6 +150,23 @@ var app = builder.Build();
 // CORS must be FIRST (before Swagger, Auth, etc.) for SignalR negotiate to succeed
 app.UseCors("AllowAngular");
 
+// ─── Global Exception Handler ──────────────────────────────────
+// MUST be after UseCors so CORS headers are already set when an exception occurs.
+// Without this, unhandled exceptions (e.g. SQL errors from missing tables) crash
+// the pipeline before any response headers are written → browser sees CORS error.
+app.UseExceptionHandler(errApp =>
+{
+    errApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var ex = feature?.Error;
+        var msg = ex?.Message ?? "An unexpected error occurred.";
+        await context.Response.WriteAsJsonAsync(new { success = false, message = msg });
+    });
+});
+
 // Enable Swagger in all environments for verification
 app.UseSwagger();
 app.UseSwaggerUI();

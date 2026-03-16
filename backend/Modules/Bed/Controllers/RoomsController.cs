@@ -77,6 +77,61 @@ namespace MediCore.API.Modules.Bed.Controllers
             }
         }
 
+        [HttpGet("db-diagnostics")]
+        [AllowAnonymous]
+        public async Task<IActionResult> DbDiagnostics()
+        {
+            var results = new List<object>();
+            try
+            {
+                using var command = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+
+                // Get all tables
+                command.CommandText = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME != '__EFMigrationsHistory'";
+                var tableNames = new List<string>();
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        tableNames.Add(reader.GetString(0));
+                    }
+                }
+
+                foreach (var tableName in tableNames)
+                {
+                    var tableInfo = new { Table = tableName, Count = -1, Error = (string?)null };
+                    try
+                    {
+                        command.CommandText = $"SELECT COUNT(*) FROM [{tableName}]";
+                        var count = await command.ExecuteScalarAsync();
+                        tableInfo = new { Table = tableName, Count = Convert.ToInt32(count), Error = (string?)null };
+                    }
+                    catch (Exception ex)
+                    {
+                        tableInfo = new { Table = tableName, Count = -1, Error = ex.Message };
+                    }
+                    results.Add(tableInfo);
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    timestamp = DateTime.UtcNow,
+                    database = _context.Database.GetDbConnection().Database,
+                    tables = results.OrderBy(r => ((dynamic)r).Table).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+            finally
+            {
+                await _context.Database.CloseConnectionAsync();
+            }
+        }
+
         [HttpGet("force-sync-migrations")]
         [AllowAnonymous]
         public async Task<IActionResult> ForceSyncMigrations()

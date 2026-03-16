@@ -53,11 +53,28 @@ namespace MediCore.API.Modules.Bed.Controllers
                     results[table] = tableStatus;
                 }
 
+                // Check Migration History
+                var appliedMigrations = new List<string>();
+                try
+                {
+                    command.CommandText = "SELECT MigrationId FROM [__EFMigrationsHistory] ORDER BY MigrationId";
+                    using var reader = await command.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        appliedMigrations.Add(reader.GetString(0));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    results["__EFMigrationsHistory"] = new { error = ex.Message };
+                }
+
                 return Ok(new 
                 { 
                     success = true, 
                     database = _context.Database.GetDbConnection().Database,
                     dataSource = _context.Database.GetDbConnection().DataSource,
+                    appliedMigrations,
                     tables = results 
                 });
             }

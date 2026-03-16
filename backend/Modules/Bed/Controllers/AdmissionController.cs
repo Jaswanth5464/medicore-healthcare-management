@@ -233,6 +233,8 @@ namespace MediCore.API.Modules.Bed.Controllers
                 return NotFound();
 
             return Ok(new { success = true, data = admission });
+        }
+        
         [HttpGet("{id}/summary")]
         public async Task<IActionResult> GetDischargeSummary(int id)
         {

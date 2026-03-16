@@ -77,6 +77,51 @@ namespace MediCore.API.Modules.Bed.Controllers
             }
         }
 
+        [HttpPost("force-sync-migrations")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForceSyncMigrations()
+        {
+            var migrationsToSync = new[]
+            {
+                "20260306082302_AuthTables",
+                "20260306082357_AddAuthTables",
+                "20260306090533_adddetails",
+                "20260306194903_new",
+                "20260308060616_AppointmentRequestsAndAppointments",
+                "20260308095929_AddOtpRecord",
+                "20260309113643_12134",
+                "20260309121658_EmailOtpRefactor",
+                "20260310110551_SyncPhaseA",
+                "20260310113059_1",
+                "20260311101236_AddDoctorLeaveAndPatientProfile",
+                "20260311113524_123456",
+                "20260311114822_1359"
+            };
+
+            try
+            {
+                using var command = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+
+                foreach (var m in migrationsToSync)
+                {
+                    command.CommandText = $"IF NOT EXISTS (SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = '{m}') " +
+                                         $"INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion]) VALUES ('{m}', '8.0.2')";
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                return Ok(new { success = true, message = "Inconsistent migration history synced. Now redeploy/restart the app to apply the IPD tables." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+            finally
+            {
+                await _context.Database.CloseConnectionAsync();
+            }
+        }
+
         [HttpGet("room-types")]
         public async Task<IActionResult> GetRoomTypes()
         {

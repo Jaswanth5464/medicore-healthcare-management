@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
-namespace MediCore.API.Infrastructure.Database.Migrations
+namespace MediCore.API.Migrations
 {
     /// <inheritdoc />
     public partial class IPDAndBedAllocation : Migration

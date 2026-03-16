@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace MediCore.API.Infrastructure.Database.Migrations
+namespace MediCore.API.Migrations
 {
     /// <inheritdoc />
     public partial class AddFeedbackSentToAdmission : Migration

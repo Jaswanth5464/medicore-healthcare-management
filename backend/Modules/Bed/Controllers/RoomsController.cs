@@ -19,6 +19,58 @@ namespace MediCore.API.Modules.Bed.Controllers
             _context = context;
         }
 
+        [HttpGet("test-db")]
+        [AllowAnonymous]
+        public async Task<IActionResult> TestDb()
+        {
+            var results = new Dictionary<string, object>();
+            var tablesToCheck = new[] { "Rooms", "RoomTypes", "BedAllocations", "PatientAdmissions", "Departments", "Users" };
+
+            try
+            {
+                using var command = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+
+                foreach (var table in tablesToCheck)
+                {
+                    var tableStatus = new Dictionary<string, object>();
+                    try
+                    {
+                        command.CommandText = $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table}'";
+                        var exists = (int)await command.ExecuteScalarAsync() > 0;
+                        tableStatus["exists"] = exists;
+
+                        if (exists)
+                        {
+                            command.CommandText = $"SELECT COUNT(*) FROM [{table}]";
+                            tableStatus["count"] = await command.ExecuteScalarAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        tableStatus["error"] = ex.Message;
+                    }
+                    results[table] = tableStatus;
+                }
+
+                return Ok(new 
+                { 
+                    success = true, 
+                    database = _context.Database.GetDbConnection().Database,
+                    dataSource = _context.Database.GetDbConnection().DataSource,
+                    tables = results 
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message, inner = ex.InnerException?.Message });
+            }
+            finally
+            {
+                await _context.Database.CloseConnectionAsync();
+            }
+        }
+
         [HttpGet("room-types")]
         public async Task<IActionResult> GetRoomTypes()
         {

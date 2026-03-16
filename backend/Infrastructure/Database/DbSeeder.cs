@@ -3,6 +3,7 @@ using MediCore.API.Modules.Auth.Models;
 using MediCore.API.Modules.Doctor.Models;
 using MediCore.API.Modules.Laboratory.Models;
 using MediCore.API.Modules.OPD.Models;
+using MediCore.API.Modules.Patient.Models;
 using MediCore.API.Modules.Pharmacy.Models;
 using MediCore.API.Modules.Bed.Models;
 using Microsoft.EntityFrameworkCore;

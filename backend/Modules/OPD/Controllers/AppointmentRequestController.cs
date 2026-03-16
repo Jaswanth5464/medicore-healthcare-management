@@ -363,6 +363,28 @@ namespace MediCore.API.Modules.OPD.Controllers
                 };
 
                 _context.Appointments.Add(appointment);
+                await _context.SaveChangesAsync(); // Save to get Appointment.Id
+
+                // Create Bill for OPD Consultation
+                var bill = new MediCore.API.Modules.Finance.Models.Bill
+                {
+                    BillNumber = $"OPD-{DateTime.UtcNow:yyyyMMdd}-{appointment.Id}",
+                    AppointmentId = appointment.Id,
+                    PatientUserId = request.PatientUserId ?? 0,
+                    DoctorProfileId = appointment.DoctorProfileId,
+                    BillSource = "OPD",
+                    SourceReferenceId = appointment.Id,
+                    SubTotal = appointment.ConsultationFee,
+                    GSTPercent = 0, // Consultation usually exempt or handled differently
+                    TotalAmount = appointment.ConsultationFee,
+                    Status = "Unpaid",
+                    CreatedAt = DateTime.UtcNow,
+                    Items = System.Text.Json.JsonSerializer.Serialize(new[] 
+                    {
+                        new { name = "Consultation Fee", amount = appointment.ConsultationFee }
+                    })
+                };
+                _context.Bills.Add(bill);
 
                 request.Status = "Converted";
                 request.HandledAt = DateTime.UtcNow;

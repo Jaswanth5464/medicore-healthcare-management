@@ -73,6 +73,27 @@ namespace MediCore.API.Modules.Patient.Controllers
 
             return Ok(new { success = true, message = "Profile updated successfully", data = profile });
         }
+
+        [HttpGet("list")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist,Doctor,Pharmacist")]
+        public async Task<IActionResult> GetAllPatients()
+        {
+            var patients = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .Where(u => u.UserRoles.Any(ur => ur.Role.Name == "Patient") && u.IsActive)
+                .OrderBy(u => u.FullName)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FullName,
+                    u.Email,
+                    u.PhoneNumber
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = patients });
+        }
     }
 
     public class UpdatePatientProfileDto

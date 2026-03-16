@@ -151,17 +151,17 @@ namespace MediCore.API.Infrastructure.Database.Context
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Department>().HasData(
-    new Department { Id = 1, Name = "General Medicine", Description = "General health consultations", Icon = "🏥", FloorNumber = 1 },
-    new Department { Id = 2, Name = "Cardiology", Description = "Heart care", Icon = "❤️", FloorNumber = 2 },
-    new Department { Id = 3, Name = "Neurology", Description = "Brain care", Icon = "🧠", FloorNumber = 2 },
-    new Department { Id = 4, Name = "Orthopedics", Description = "Bone care", Icon = "🦴", FloorNumber = 3 },
-    new Department { Id = 5, Name = "Pediatrics", Description = "Children care", Icon = "👶", FloorNumber = 1 },
-    new Department { Id = 6, Name = "Gynecology", Description = "Women health", Icon = "🌸", FloorNumber = 4 },
-    new Department { Id = 7, Name = "Dermatology", Description = "Skin care", Icon = "✨", FloorNumber = 2 },
-    new Department { Id = 8, Name = "Ophthalmology", Description = "Eye care", Icon = "👁️", FloorNumber = 1 },
-    new Department { Id = 9, Name = "ENT", Description = "Ear nose throat", Icon = "👂", FloorNumber = 3 },
-    new Department { Id = 10, Name = "Psychiatry", Description = "Mental health", Icon = "🧘", FloorNumber = 4 }
-);
+                new Department { Id = 1, Name = "General Medicine", Description = "General health consultations", Icon = "🏥", FloorNumber = 1, IsActive = true },
+                new Department { Id = 2, Name = "Cardiology", Description = "Heart care", Icon = "❤️", FloorNumber = 2, IsActive = true },
+                new Department { Id = 3, Name = "Neurology", Description = "Brain care", Icon = "🧠", FloorNumber = 2, IsActive = true },
+                new Department { Id = 4, Name = "Orthopedics", Description = "Bone care", Icon = "🦴", FloorNumber = 3, IsActive = true },
+                new Department { Id = 5, Name = "Pediatrics", Description = "Children care", Icon = "👶", FloorNumber = 1, IsActive = true },
+                new Department { Id = 6, Name = "Gynecology", Description = "Women health", Icon = "🌸", FloorNumber = 4, IsActive = true },
+                new Department { Id = 7, Name = "Dermatology", Description = "Skin care", Icon = "✨", FloorNumber = 2, IsActive = true },
+                new Department { Id = 8, Name = "Ophthalmology", Description = "Eye care", Icon = "👁️", FloorNumber = 1, IsActive = true },
+                new Department { Id = 9, Name = "ENT", Description = "Ear nose throat", Icon = "👂", FloorNumber = 3, IsActive = true },
+                new Department { Id = 10, Name = "Psychiatry", Description = "Mental health", Icon = "🧘", FloorNumber = 4, IsActive = true }
+            );
 
             // Seed RoomTypes
             modelBuilder.Entity<RoomType>().HasData(

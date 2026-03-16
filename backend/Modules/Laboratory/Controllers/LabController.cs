@@ -74,6 +74,28 @@ namespace MediCore.API.Modules.Laboratory.Controllers
 
             await _context.SaveChangesAsync();
 
+            // Create Bill for Laboratory Test
+            var bill = new MediCore.API.Modules.Finance.Models.Bill
+            {
+                BillNumber = $"LAB-{DateTime.UtcNow:yyyyMMdd}-{order.Id}",
+                AppointmentId = order.AppointmentId,
+                PatientUserId = order.PatientUserId,
+                DoctorProfileId = order.DoctorProfileId,
+                BillSource = "Laboratory",
+                SourceReferenceId = order.Id,
+                SubTotal = order.Price,
+                GSTPercent = 0,
+                TotalAmount = order.Price,
+                Status = "Unpaid",
+                CreatedAt = DateTime.UtcNow,
+                Items = System.Text.Json.JsonSerializer.Serialize(new[] 
+                {
+                    new { name = $"Lab Test: {order.TestType}", amount = order.Price }
+                })
+            };
+            _context.Bills.Add(bill);
+            await _context.SaveChangesAsync();
+
             // Real-time notifications
             var appointment = await _context.Appointments
                 .Include(a => a.DoctorProfile)

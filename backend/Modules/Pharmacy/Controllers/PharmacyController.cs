@@ -40,29 +40,29 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
 
         // POST api/pharmacy/inventory  (Add new medicine)
         [HttpPost("inventory")]
-        public async Task<IActionResult> AddMedicine([FromBody] Medicine medicine)
+        public async Task<IActionResult> AddMedicine([FromBody] CreateMedicineDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid medicine data" });
 
-            if (string.IsNullOrWhiteSpace(medicine.Name))
+            if (string.IsNullOrWhiteSpace(dto.Name))
                 return BadRequest(new { success = false, message = "Medicine name is required" });
 
             // Check for duplicate
-            var exists = await _context.Medicines.AnyAsync(m => m.Name == medicine.Name);
+            var exists = await _context.Medicines.AnyAsync(m => m.Name.ToLower() == dto.Name.ToLower().Trim());
             if (exists)
                 return Conflict(new { success = false, message = "A medicine with this name already exists" });
 
             var newMed = new Medicine
             {
-                Name = medicine.Name.Trim(),
-                GenericName = medicine.GenericName?.Trim() ?? string.Empty,
-                Category = medicine.Category?.Trim() ?? "Tablet",
-                Manufacturer = medicine.Manufacturer?.Trim() ?? string.Empty,
-                Price = medicine.Price,
-                StockQuantity = medicine.StockQuantity,
-                LowStockThreshold = medicine.LowStockThreshold > 0 ? medicine.LowStockThreshold : 50,
-                ExpiryDate = medicine.ExpiryDate,
+                Name = dto.Name.Trim(),
+                GenericName = dto.GenericName?.Trim() ?? string.Empty,
+                Category = dto.Category?.Trim() ?? "Tablet",
+                Manufacturer = dto.Manufacturer?.Trim() ?? string.Empty,
+                Price = dto.Price,
+                StockQuantity = dto.StockQuantity,
+                LowStockThreshold = dto.LowStockThreshold > 0 ? dto.LowStockThreshold : 50,
+                ExpiryDate = dto.ExpiryDate,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -123,8 +123,8 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
                 .Select(p => new {
                     id = p.Id,
                     appointmentId = p.AppointmentId,
-                    patientName = p.Appointment.PatientUser.FullName,
-                    doctorName = p.Appointment.DoctorProfile.User.FullName,
+                    patientName = _context.Users.Where(u => u.Id == p.PatientUserId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown Patient",
+                    doctorName = _context.Users.Where(u => u.Id == _context.DoctorProfiles.Where(d => d.Id == p.DoctorProfileId).Select(d => d.UserId).FirstOrDefault()).Select(u => u.FullName).FirstOrDefault() ?? "Staff Doctor",
                     medicinesJson = p.MedicinesJson,
                     advice = p.Advice,
                     createdAt = p.CreatedAt,
@@ -308,6 +308,18 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
         {
             public int MedicineId { get; set; }
             public int Count { get; set; }
+        }
+
+        public class CreateMedicineDto
+        {
+            public string Name { get; set; } = string.Empty;
+            public string? GenericName { get; set; }
+            public string? Category { get; set; }
+            public string? Manufacturer { get; set; }
+            public decimal Price { get; set; }
+            public int StockQuantity { get; set; }
+            public int LowStockThreshold { get; set; }
+            public DateTime? ExpiryDate { get; set; }
         }
     }
 }

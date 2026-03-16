@@ -137,8 +137,8 @@ namespace MediCore.API.Modules.Bed.Controllers
                 admission.FinalDiagnosis = request.FinalDiagnosis;
                 
                 var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (userIdClaim != null)
-                    admission.DischargedByUserId = int.Parse(userIdClaim);
+                var currentUserId = userIdClaim != null ? int.Parse(userIdClaim) : 0;
+                admission.DischargedByUserId = currentUserId;
 
                 // 2. Create Discharge Note
                 var note = new DischargeNote
@@ -153,10 +153,44 @@ namespace MediCore.API.Modules.Bed.Controllers
                     DischargeType = request.DischargeType,
                     CreatedAt = DateTime.UtcNow
                 };
-
                 _context.DischargeNotes.Add(note);
 
-                // 3. Free the Bed (Set to Cleaning)
+                // 3. Automated Billing Calculation
+                var stayDays = (int)Math.Max(1, (admission.ActualDischargeDate.Value - admission.AdmissionDate).TotalDays);
+                var roomRent = stayDays * admission.DailyRoomCharge;
+                
+                var serviceCharges = await _context.DailyIPDCharges
+                    .Where(c => c.AdmissionId == admission.Id)
+                    .SumAsync(c => c.DoctorVisitCharge + c.NursingCharge + c.MedicineCharge + c.LabCharge + c.ProcedureCharge + c.OtherCharges);
+                
+                var subTotal = roomRent + serviceCharges;
+                decimal gstPercent = 18;
+                decimal gstAmount = Math.Round(subTotal * (gstPercent / 100), 2);
+                decimal grandTotal = subTotal + gstAmount;
+
+                // 4. Create Final Bill
+                var bill = new MediCore.API.Modules.Finance.Models.Bill
+                {
+                    BillNumber = $"IPD-{DateTime.UtcNow:yyyyMMdd}-{admission.Id}",
+                    PatientUserId = admission.PatientUserId,
+                    DoctorProfileId = admission.AdmittingDoctorProfileId,
+                    BillSource = "IPD",
+                    SourceReferenceId = admission.Id,
+                    SubTotal = subTotal,
+                    GSTPercent = gstPercent,
+                    GSTAmount = gstAmount,
+                    TotalAmount = grandTotal,
+                    Status = "Unpaid",
+                    CreatedAt = DateTime.UtcNow,
+                    Items = System.Text.Json.JsonSerializer.Serialize(new[] 
+                    {
+                        new { name = $"Room Rent ({stayDays} days x {admission.DailyRoomCharge})", amount = roomRent },
+                        new { name = "Service & Procedure Charges", amount = serviceCharges }
+                    })
+                };
+                _context.Bills.Add(bill);
+
+                // 5. Free the Bed (Set to Cleaning)
                 if (admission.Bed != null)
                 {
                     admission.Bed.Status = "Cleaning";
@@ -166,7 +200,12 @@ namespace MediCore.API.Modules.Bed.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return Ok(new { success = true, message = "Patient discharged successfully." });
+                return Ok(new { 
+                    success = true, 
+                    message = "Patient discharged and bill generated successfully.",
+                    billNumber = bill.BillNumber,
+                    totalAmount = grandTotal
+                });
             }
             catch (Exception ex)
             {
@@ -194,6 +233,57 @@ namespace MediCore.API.Modules.Bed.Controllers
                 return NotFound();
 
             return Ok(new { success = true, data = admission });
+        [HttpGet("{id}/summary")]
+        public async Task<IActionResult> GetDischargeSummary(int id)
+        {
+            var admission = await _context.PatientAdmissions
+                .Include(a => a.PatientUser)
+                .Include(a => a.AdmittingDoctor)
+                .ThenInclude(d => d.User)
+                .Include(a => a.Department)
+                .Include(a => a.Room)
+                .Include(a => a.RoomType)
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (admission == null) return NotFound(new { success = false, message = "Admission record not found" });
+
+            var note = await _context.DischargeNotes
+                .FirstOrDefaultAsync(n => n.AdmissionId == id);
+
+            var bill = await _context.Bills
+                .Where(b => b.BillSource == "IPD" && b.SourceReferenceId == id)
+                .FirstOrDefaultAsync();
+
+            var charges = await _context.DailyIPDCharges
+                .Where(c => c.AdmissionId == id)
+                .OrderBy(c => c.ChargeDate)
+                .ToListAsync();
+
+            return Ok(new {
+                success = true,
+                data = new {
+                    admissionInfo = new {
+                        admission.AdmissionNumber,
+                        admission.AdmissionDate,
+                        admission.ActualDischargeDate,
+                        PatientName = admission.PatientUser?.FullName,
+                        DoctorName = admission.AdmittingDoctor?.User?.FullName,
+                        DepartmentName = admission.Department?.Name,
+                        RoomNumber = admission.Room?.RoomNumber,
+                        RoomType = admission.RoomType?.Name
+                    },
+                    record = note,
+                    billingSummary = bill != null ? new {
+                        bill.BillNumber,
+                        bill.SubTotal,
+                        bill.GSTAmount,
+                        bill.TotalAmount,
+                        bill.Status,
+                        Items = bill.Items != null ? System.Text.Json.JsonSerializer.Deserialize<object>(bill.Items) : null
+                    } : null,
+                    dailyCharges = charges
+                }
+            });
         }
     }
 }

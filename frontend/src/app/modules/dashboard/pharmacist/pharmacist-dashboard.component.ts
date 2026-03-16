@@ -101,6 +101,7 @@ export class PharmacistDashboardComponent implements OnInit {
     this.http.get<{success: boolean, data: any[]}>(`${this.BASE_URL}/api/pharmacy/queue`)
       .subscribe({
         next: (res) => {
+          // The backend now provides patientName directly in the queue object
           this.queueStr.set(res.data);
           this.isLoading.set(false);
         },

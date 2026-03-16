@@ -260,5 +260,45 @@ namespace MediCore.API.Modules.Bed.Controllers
 
             return Ok(new { success = true, data = beds });
         }
+
+        [HttpPost("repair-data")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RepairData()
+        {
+            try
+            {
+                // 1. Ensure all Departments are Active
+                var depts = await _context.Departments.ToListAsync();
+                foreach (var d in depts) d.IsActive = true;
+
+                // 2. Ensure all Doctor Profiles are Active
+                var doctors = await _context.DoctorProfiles.ToListAsync();
+                foreach (var d in doctors) d.IsActive = true;
+
+                // 3. Ensure all Patients are Active
+                var patients = await _context.Users
+                    .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                    .Where(u => u.UserRoles.Any(ur => ur.Role.Name == "Patient"))
+                    .ToListAsync();
+                foreach (var p in patients) p.IsActive = true;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new { 
+                    success = true, 
+                    message = "Data repair completed.", 
+                    details = new {
+                        departmentsFixed = depts.Count,
+                        doctorsFixed = doctors.Count,
+                        patientsFixed = patients.Count
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
     }
 }

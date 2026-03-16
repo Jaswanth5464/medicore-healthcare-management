@@ -41,6 +41,20 @@ export class IpdService {
     return this.http.get(`${this.apiUrl}/admission/${id}`);
   }
 
+  getDischargeSummary(admissionId: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/admission/${admissionId}/summary`);
+  }
+
+  // Global Data / Diagnostics
+  getAllPatients(): Observable<any> {
+    // Calling the patient profile list endpoint
+    return this.http.get(`${this.config.apiUrl}/patient/profiles/list`);
+  }
+
+  repairData(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/rooms/repair-data`, {});
+  }
+
   // Billing
   getChargesForAdmission(admissionId: number): Observable<any> {
     return this.http.get(`${this.apiUrl}/ipdbilling/charges/${admissionId}`);

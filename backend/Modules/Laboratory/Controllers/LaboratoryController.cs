@@ -12,7 +12,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
 {
     [ApiController]
     [Route("api/laboratory")]
-    [Authorize(Roles = "SuperAdmin,HospitalAdmin,LabTechnician")]
+    [Authorize(Roles = "SuperAdmin,HospitalAdmin,LabTechnician,Doctor")]
     public class LaboratoryController : ControllerBase
     {
         private readonly MediCoreDbContext _context;

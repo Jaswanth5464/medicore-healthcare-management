@@ -166,6 +166,8 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                     .SendAsync("LabReportReady", new { 
                         orderId = order.Id, 
                         patientName = patientName, 
+                        patientUserId = order.PatientUserId,
+                        isCritical = order.CriticalAlert,
                         testType = order.TestType,
                         billAmount = order.Price
                     });
@@ -175,6 +177,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             await _hubContext.Clients.Group($"user-{order.PatientUserId}")
                 .SendAsync("LabReportReady", new { 
                     orderId = order.Id, 
+                    isCritical = order.CriticalAlert,
                     testType = order.TestType,
                     billAmount = order.Price
                 });

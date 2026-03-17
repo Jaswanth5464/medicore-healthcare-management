@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -60,6 +60,10 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
           <button [class.active]="activeTab() === 'performance'" (click)="loadPerformance()">
             Performance
           </button>
+          <button [class.active]="activeTab() === 'lab-reports'" (click)="openLabReportsTab()">
+            Lab Reports
+          </button>
+
           <button [class.active]="activeTab() === 'hospital-chat'" (click)="activeTab.set('hospital-chat')">
             Staff Chat
           </button>
@@ -353,13 +357,88 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
                    <div class="icon">💬</div>
                    <p>Select a patient to start chatting</p>
                 </div>
-                <app-patient-doctor-chat 
+                  <app-patient-doctor-chat 
                   *ngIf="selectedPartner()"
                   [otherUserId]="selectedPartner()!.id" 
                   [otherUserName]="selectedPartner()!.fullName"
                   [isMini]="false"
                   (close)="selectedPartner.set(null)">
                 </app-patient-doctor-chat>
+              </div>
+            </div>
+          </div>
+
+          <!-- LAB REPORTS TAB -->
+          <div *ngIf="activeTab() === 'lab-reports'" class="fade-in lab-reports-container">
+            <div class="panel">
+              <div class="panel-head">
+                <h3><span class="icon">🔬</span> Patient Lab Results — Detailed View</h3>
+                <div class="actions">
+                  <button class="small-btn refresh-pulse" (click)="loadAllLabReports()">Refresh All</button>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div *ngIf="allLabReports().length === 0" class="empty-msg">No lab reports found for your patients.</div>
+                <div class="table-frame" *ngIf="allLabReports().length > 0">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Patient Details</th>
+                        <th>Test Information</th>
+                        <th>Ordered Date</th>
+                        <th>Status</th>
+                        <th>Results Summary</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let report of allLabReports()" [class.critical-row]="report.criticalAlert">
+                        <td>
+                          <div class="patient-card-small">
+                            <div class="p-avatar">{{ report.patientName?.[0] }}</div>
+                            <div class="p-info">
+                              <span class="p-name">{{ report.patientName }}</span>
+                              <span class="p-meta">Age: {{ report.patientAge }} | {{ report.patientGender }} | #{{ report.patientUserId }}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div class="test-card-small">
+                            <span class="test-type">{{ report.testType }}</span>
+                            <span class="appt-link">Appt: #{{ report.appointmentId }}</span>
+                          </div>
+                        </td>
+                        <td><span class="date-chip">{{ formatDateShort(report.createdAt) }}</span></td>
+                        <td>
+                          <div class="status-stack">
+                            <span class="status-badge" [class]="report.status.toLowerCase()">{{ report.status }}</span>
+                            <span *ngIf="report.criticalAlert" class="critical-badge">CRITICAL</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div *ngIf="report.resultsJson" class="results-preview-list">
+                            <div *ngFor="let r of parseResults(report.resultsJson).slice(0,3)" class="res-item">
+                              <span class="res-param">{{ r.parameter }}:</span>
+                              <span class="res-val">{{ r.value }}</span>
+                            </div>
+                            <span *ngIf="parseResults(report.resultsJson).length > 3" class="more-res">+{{ parseResults(report.resultsJson).length - 3 }} more</span>
+                          </div>
+                          <span *ngIf="!report.resultsJson" class="no-res">Pending results...</span>
+                        </td>
+                        <td>
+                          <div class="action-stack">
+                            <button class="action-btn view" (click)="openQuickView(report)">
+                              <span class="icon">👁️</span> Open
+                            </button>
+                            <a *ngIf="report.reportUrl" [href]="report.reportUrl" target="_blank" class="action-btn pdf">
+                              <span class="icon">📄</span> PDF
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -542,12 +621,38 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
     .pdf-link:hover { text-decoration:underline; }
     .lo-tech-notes { font-size:11px; color:#64748b; font-style:italic; }
 
-    /* Lab Alerts Styles */
-    .lab-alerts-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .alerts-scroll { display: flex; gap: 12px; padding: 12px; overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; }
-    .alerts-scroll::-webkit-scrollbar { display: none; }
-    .lab-alert-card { flex: 0 0 200px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
-    .lab-alert-card:hover { transform: translateY(-2px); border-color: #3b82f6; background: #eff6ff; }
+    /* Premium Lab Reports Tab Styles */
+    .lab-reports-container { min-height: 500px; display: flex; flex-direction: column; height: 100%; }
+    .lab-reports-container .panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .lab-reports-container .panel-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .refresh-pulse:active { transform: scale(0.95); }
+    .table-frame { flex: 1; overflow-y: auto; border-top: 1px solid #f1f5f9; scrollbar-width: thin; }
+    .patient-card-small { display: flex; align-items: center; gap: 10px; }
+    .p-avatar { width: 32px; height: 32px; background: #e0f2fe; color: #0369a1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    .p-name { display: block; font-weight: 600; color: #0f172a; font-size: 13.5px; }
+    .p-meta { font-size: 11px; color: #64748b; }
+    .test-card-small { display: flex; flex-direction: column; gap: 2px; }
+    .test-type { font-weight: 700; color: #1e4ed8; font-size: 13px; }
+    .appt-link { font-size: 10px; color: #94a3b8; font-weight: 600; }
+    .date-chip { font-size: 12px; color: #475569; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+    .status-stack { display: flex; flex-direction: column; gap: 4px; }
+    .critical-badge { background: #fee2e2; color: #ef4444; font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 4px; border: 1px solid #fecaca; text-align: center; }
+    .status-badge.completed { background: #dcfce7; color: #166534; }
+    .status-badge.processing { background: #fef3c7; color: #d97706; }
+    .status-badge.requested { background: #f1f5f9; color: #64748b; }
+    .critical-row { background: #fff1f2 !important; }
+    .results-preview-list { display: flex; flex-direction: column; gap: 2px; }
+    .res-item { font-size: 11px; display: flex; gap: 4px; }
+    .res-param { color: #64748b; }
+    .res-val { font-weight: 700; color: #0f172a; }
+    .more-res { font-size: 10px; color: #3b82f6; font-weight: 600; }
+    .action-stack { display: flex; gap: 6px; }
+    .action-btn { padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 4px; }
+    .action-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .action-btn.view { color: #0369a1; border-color: #bae6fd; background: #f0f9ff; }
+    .action-btn.pdf { color: #ef4444; border-color: #fecaca; background: #fff1f2; }
+    .empty-msg { padding: 40px; text-align: center; color: #94a3b8; font-style: italic; }
+
     .alert-info { display: flex; flex-direction: column; }
     .alert-info strong { font-size: 13px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .alert-info span { font-size: 11px; color: #64748b; }
@@ -559,7 +664,7 @@ export class DoctorDashboardComponent implements OnInit {
   private readonly config = inject(ConfigService);
   private readonly BASE_URL = this.config.baseApiUrl;
   
-  activeTab = signal<'schedule' | 'consultation' | 'leaves' | 'performance' | 'hospital-chat' | 'patient-chat'>('schedule');
+  activeTab = signal<'schedule' | 'consultation' | 'leaves' | 'performance' | 'hospital-chat' | 'patient-chat' | 'lab-reports'>('schedule');
   viewingApptDate = signal('');
   consultationData = signal<any>(null);
   activePatientUserId: string | null = null;
@@ -570,6 +675,7 @@ export class DoctorDashboardComponent implements OnInit {
   myLeaves = signal<any[]>([]);
   activeVideoRoom = signal<any>(null);
   recentLabs = signal<any[]>([]);
+  allLabReports = signal<any[]>([]);
 
   // Patient Chat Tab State
   chatPartners = signal<any[]>([]);
@@ -608,7 +714,26 @@ export class DoctorDashboardComponent implements OnInit {
     private http: HttpClient,
     public auth: AuthService,
     private notify: NotificationService
-  ) { }
+  ) { 
+    // Real-time refresh for lab results
+    effect(() => {
+      const notifications = this.signalR.notifications();
+      if (notifications.length > 0) {
+        const lastNotif = notifications[0];
+        if (lastNotif.type === 'LAB_READY' && !lastNotif.isRead) {
+          console.log('SignalR: Lab Report Ready notification received. Refreshing...');
+          this.loadRecentLabs();
+          if (this.activeTab() === 'lab-reports') {
+            this.loadAllLabReports();
+          }
+          // Optional: Show a sticky toast if it's critical
+          if (lastNotif.data?.isCritical) {
+            this.notify.info(`CRITICAL Lab Result for ${lastNotif.data.patientName}!`, 'Priority Alert');
+          }
+        }
+      }
+    });
+  }
 
   ngOnInit() {
     this.loadProfile();
@@ -626,7 +751,7 @@ export class DoctorDashboardComponent implements OnInit {
         if (res.success) {
           this.myProfile.set(res.data);
           // Load today's stats via service using doctorId
-          this.state.loadToday(this.getHeaders(), res.data.id);
+          this.state.loadToday(this.getHeaders(), Number(res.data.id));
           this.loadRecentLabs();
         }
         this.loadingProfile.set(false);
@@ -935,6 +1060,22 @@ export class DoctorDashboardComponent implements OnInit {
   openPatientChatTab() {
     this.activeTab.set('patient-chat');
     this.loadChatPartners();
+  }
+
+  openLabReportsTab() {
+    this.activeTab.set('lab-reports');
+    this.loadAllLabReports();
+  }
+
+  loadAllLabReports() {
+    if (!this.myProfile()) return;
+    this.http.get<any>(`${this.BASE_URL}/api/laboratory/orders?doctorProfileId=${this.myProfile().id}`, { headers: this.getHeaders() })
+      .subscribe({
+        next: (res) => {
+          if (res.success) this.allLabReports.set(res.data);
+        },
+        error: () => this.notify.error('Failed to load lab reports.')
+      });
   }
 
   loadChatPartners() {

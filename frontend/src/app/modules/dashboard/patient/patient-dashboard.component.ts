@@ -73,6 +73,7 @@ declare var QRCode: any;
         <button [class.active]="activeTab() === 'upcoming'" (click)="activeTab.set('upcoming')">Upcoming Appointments</button>
         <button [class.active]="activeTab() === 'past'" (click)="activeTab.set('past')">Past Visits</button>
         <button [class.active]="activeTab() === 'bills'" (click)="activeTab.set('bills')">My Bills</button>
+        <button [class.active]="activeTab() === 'lab-results'" (click)="openLabResultsTab()">My Lab Results</button>
         <button [class.active]="activeTab() === 'profile'" (click)="activeTab.set('profile')">My Profile</button>
         <button [class.active]="activeTab() === 'book'" (click)="activeTab.set('book')">Book Doctor</button>
       </div>
@@ -787,6 +788,35 @@ declare var QRCode: any;
     .action-btn-sm.qr { border-color:#6366f1; color:#6366f1; background:#f5f3ff; }
     .action-btn-sm.qr:hover { background: #e0e7ff; }
 
+    /* LAB RESULTS PORTAL STYLES */
+    .lab-results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 24px; padding: 10px 0; }
+    .lab-result-card { background: #fff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); transition: 0.2s; }
+    .lab-result-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.06); }
+    .lab-result-card.critical { border-left: 4px solid #ef4444; }
+    .lr-header { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; background: #fcfdfe; }
+    .lr-title { display: flex; align-items: center; gap: 12px; }
+    .lr-icon { font-size: 24px; }
+    .lr-title h3 { font-size: 16px; color: #1e293b; margin: 0; }
+    .lr-title small { font-size: 11px; color: #64748b; }
+    .lr-status-badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; }
+    .lr-status-badge.completed { background: #dcfce7; color: #166534; }
+    .lr-status-badge.processing { background: #fef3c7; color: #b45309; }
+    .lr-status-badge.requested { background: #f1f5f9; color: #64748b; }
+    .lr-body { padding: 20px; }
+    .critical-ribbon { background: #fee2e2; color: #ef4444; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 700; margin-bottom: 16px; text-align: center; border: 1px solid #fecaca; }
+    .lr-table-mini table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .lr-table-mini th { text-align: left; color: #64748b; font-size: 11px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+    .lr-table-mini td { padding: 8px 0; border-bottom: 1px dashed #f1f5f9; }
+    .res-val { font-weight: 700; color: #1e1b4b; }
+    .res-ref { font-size: 11px; color: #94a3b8; }
+    .processing-msg, .requested-msg { padding: 20px; text-align: center; color: #64748b; font-size: 13px; font-style: italic; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .lr-footer { padding: 16px 20px; background: #f8fafc; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+    .bill-label { font-size: 11px; color: #64748b; font-weight: 600; margin-right: 8px; }
+    .bill-amount { font-size: 13px; font-weight: 700; color: #ef4444; }
+    .bill-amount.paid { color: #10b981; }
+    .spinner-sm { width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     /* QR MODAL */
     .qr-modal { max-width:400px; text-align:center; }
     .qr-body { padding:30px; }
@@ -831,13 +861,14 @@ declare var QRCode: any;
 export class PatientDashboardComponent implements OnInit, AfterViewChecked {
   private readonly config = inject(ConfigService);
   private readonly BASE_URL = this.config.baseApiUrl;
-  activeTab = signal<'upcoming' | 'past' | 'book' | 'bills' | 'profile'>('upcoming');
+  activeTab = signal<'upcoming' | 'past' | 'bills' | 'profile' | 'book' | 'lab-results'>('upcoming');
   loading = signal(true);
   selectedBillForPrint = signal<any>(null);
   selectedChatDoctor = signal<any>(null);
 
   upcoming = signal<any[]>([]);
   past = signal<any[]>([]);
+  myLabOrders = signal<any[]>([]);
   bills = signal<any[]>([]);
   patientProfile = signal<any>({});
   bookIsVideo = false;
@@ -958,7 +989,7 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
     // Auto load bills when switching to bills tab
     // (Or we can just load them upfront)
     this.loadBills();
-    this.loadProfile();
+    this.loadProfileData();
     this.setupVideoListener();
   }
 
@@ -1009,6 +1040,32 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
     }
   }
 
+  loadProfileData() {
+    this.http.get<any>(`${this.BASE_URL}/api/patients/profile`, { headers: this.getHeaders() }).subscribe(res => {
+      this.patientProfile.set(res.data || {});
+      this.profileEdit = { ...res.data };
+    });
+  }
+
+  openLabResultsTab() {
+    this.activeTab.set('lab-results');
+    this.loadLabResults();
+  }
+
+  loadLabResults() {
+    this.loading.set(true);
+    this.http.get<any>(`${this.BASE_URL}/api/laboratory/my-orders`, { headers: this.getHeaders() }).subscribe({
+      next: (res) => {
+        this.myLabOrders.set(res.data || []);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
+    });
+  }
+
+  loadStreak() {
+  }
+
   payBill(bill: any) {
     this.notify.info('Online Payments are Launching Soon! 🚀');
     this.notify.warning('Currently, only payment at reception is available. Please pay at the hospital counter.');
@@ -1056,15 +1113,6 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  loadProfile() {
-    this.http.get<any>(`${this.BASE_URL}/api/patient/profiles/my`, { headers: this.getHeaders() }).subscribe(res => {
-      if (res.success) {
-        this.patientProfile.set(res.data);
-        this.profileEdit = { ...res.data };
-      }
-    });
-  }
-
   requestOfflinePayment(appt: any) {
     this.http.post<any>(`${this.BASE_URL}/api/appointments/${appt.id}/request-offline-payment`, {}, { headers: this.getHeaders() })
       .subscribe({
@@ -1082,7 +1130,7 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
     this.http.put<any>(`${this.BASE_URL}/api/patient/profiles`, this.profileEdit, { headers: this.getHeaders() }).subscribe(res => {
       if (res.success) {
         this.notify.success('Profile updated successfully');
-        this.loadProfile();
+        this.loadProfileData();
       }
     });
   }

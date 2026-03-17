@@ -158,11 +158,18 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
                               (click)="openUploadModal(order)">
                         Add Results
                       </button>
-                      <button *ngIf="order.status === 'Completed'" 
-                              class="btn-view" 
-                              (click)="viewReport(order.reportUrl)">
-                        Report
-                      </button>
+                      <div style="display:flex; gap:4px; justify-content: flex-end;">
+                        <button *ngIf="order.status === 'Completed'" 
+                                class="btn-email" 
+                                (click)="sendEmail(order.id)">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        </button>
+                        <button *ngIf="order.status === 'Completed'" 
+                                class="btn-view" 
+                                (click)="viewReport(order.reportUrl)">
+                          PDF
+                        </button>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -376,6 +383,8 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
     .btn-collect:disabled { opacity:0.5; cursor:not-allowed; }
     .btn-complete { background:#8b5cf6; color:#fff; }
     .btn-view { background:#f1f5f9; color:#1e1b4b; }
+    .btn-email { background:#0ea5e9; color:#fff; display: flex; align-items: center; justify-content: center; }
+    .btn-email:hover { background:#0284c7; }
 
     /* Modal Styling */
     .modal-overlay { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.6); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; z-index:1000; }
@@ -548,6 +557,17 @@ export class LabDashboardComponent implements OnInit {
   viewReport(url: string) {
     if (url) window.open(url, '_blank');
     else this.ns.info('No PDF report generated yet.');
+  }
+
+  sendEmail(orderId: number) {
+    this.http.post<any>(`${this.BASE_URL}/api/laboratory/orders/${orderId}/email`, {}, { headers: this.getHeaders() })
+      .subscribe({
+        next: (res) => {
+          if (res.success) this.ns.success('Report successfully sent to patient email.');
+          else this.ns.error(res.message || 'Failed to send email.');
+        },
+        error: () => this.ns.error('Failed to send email. Ensure patient has a valid email address.')
+      });
   }
 
   createNewTestMaster() {

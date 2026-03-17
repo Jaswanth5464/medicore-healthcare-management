@@ -97,11 +97,22 @@ namespace MediCore.API.Modules.Finance.Controllers
             {
                 bill.PaidAt = DateTime.UtcNow;
                 bill.PaymentMode = dto.PaymentMode ?? "Cash";
+
+                // Ensure Lab sync: If this is a Lab bill, update the Lab order to "Pending" (Ready for collection)
+                if (bill.BillSource == "Laboratory" && bill.SourceReferenceId.HasValue)
+                {
+                    var order = await _context.LabOrders.FindAsync(bill.SourceReferenceId.Value);
+                    if (order != null && (order.Status == "Requested" || order.Status == "Pending"))
+                    {
+                        // We check for Requested or Pending just in case, but Requested is the primary one waiting for payment.
+                        order.Status = "Pending"; 
+                    }
+                }
             }
             bill.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return Ok(new { success = true, message = "Bill status updated successfully" });
+            return Ok(new { success = true, message = "Bill status updated and related records synchronized" });
         }
 
         [HttpPost("bills/{id}/email")]

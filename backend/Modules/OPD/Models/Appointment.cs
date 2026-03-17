@@ -3,6 +3,8 @@ using MediCore.API.Modules.Auth.Models;
 
 namespace MediCore.API.Modules.OPD.Models
 {
+// This model represents a single Appointment.
+// It tracks the patient, the doctor, the date/time, the payment status, and even video call details.
     public class Appointment
     {
         public int Id { get; set; }

@@ -2,6 +2,7 @@ using System;
 
 namespace MediCore.API.Modules.Finance.Models
 {
+// This model records any money the hospital spends (like buying medicines or paying electricity).
     public class Expense
     {
         public int Id { get; set; }

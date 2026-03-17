@@ -1,3 +1,10 @@
+// This file (DbSeeder) is responsible for setting up the "First Run" data in the database.
+// It populates the system with initial data like:
+// - List of Medicines for the Pharmacy
+// - List of Lab Tests and their prices
+// - Hospital Departments, Doctors, and Patient accounts
+// - Room and Bed layout across different floors
+// This ensures that the system is ready to use immediately after installation.
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Auth.Models;
 using MediCore.API.Modules.Doctor.Models;

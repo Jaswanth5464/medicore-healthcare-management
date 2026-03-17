@@ -135,7 +135,10 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             return Ok(new { success = true, data = prescriptions });
         }
 
-        // POST api/pharmacy/dispense/{prescriptionId}
+        // This function handles medicine dispensing for patients. It:
+        // 1. Checks if the patient is registered.
+        // 2. Calculates the cost of the medicines.
+        // 3. Automatically generates a "Paid" bill so the finance system is updated.
         [HttpPost("dispense/{prescriptionId}")]
         public async Task<IActionResult> DispensePrescription(int prescriptionId)
         {
@@ -209,7 +212,8 @@ namespace MediCore.API.Modules.Pharmacy.Controllers
             return Ok(new { success = true, message = "Medicines dispensed and bill generated successfully", billAmount = totalBill });
         }
 
-        // POST api/pharmacy/walk-in
+        // This function handles walk-in customers who buy medicine without a specific doctor's prescription.
+        // It calculates the total price, handles stock deduction, and creates a bill.
         [HttpPost("walk-in")]
         public async Task<IActionResult> ProcessWalkInSale([FromBody] WalkInSaleDto dto)
         {

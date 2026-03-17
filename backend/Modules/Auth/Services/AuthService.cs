@@ -34,6 +34,8 @@ namespace MediCore.API.Modules.Auth.Services
             _configuration = configuration;
         }
 
+        // This function registers a new user. It checks if the email is available,
+        // hashes the password for security, and saves the new user to the database.
         public async Task<ApiResponse<AuthResponse>> RegisterAsync(RegisterRequest request)
         {
             // Check if email already exists
@@ -72,6 +74,10 @@ namespace MediCore.API.Modules.Auth.Services
             return await GenerateAuthResponse(user);
         }
 
+        // This function handles user login. It:
+        // 1. Finds the user by their email.
+        // 2. Verifies their password using a secure matching algorithm.
+        // 3. Generates a "Digital ID Card" (JWT Token) so they can access the app.
         public async Task<ApiResponse<AuthResponse>> LoginAsync(LoginRequest request)
         {
             // Find user by email and include Role data
@@ -109,6 +115,8 @@ namespace MediCore.API.Modules.Auth.Services
                 return DateTime.UtcNow.AddHours(5).AddMinutes(30);
             }
         }
+        // This function lets a user stay logged in without typing their password again.
+        // It uses a "Refresh Token" to get a fresh "Digital ID Card" (Access Token).
         public async Task<ApiResponse<AuthResponse>> RefreshTokenAsync(string refreshToken)
         {
             // Find the refresh token in database
@@ -134,6 +142,7 @@ namespace MediCore.API.Modules.Auth.Services
             return await GenerateAuthResponse(storedToken.User);
         }
 
+        // This is a helper function that creates both the Access Token and the Refresh Token for a user.
         private async Task<ApiResponse<AuthResponse>> GenerateAuthResponse(User user)
         {
             var accessToken = _tokenService.GenerateAccessToken(user);
@@ -170,6 +179,7 @@ namespace MediCore.API.Modules.Auth.Services
 
             return ApiResponse<AuthResponse>.Ok(response, "Authentication successful.");
         }
+        // This function logs a user out by deleting their login session from the database.
         public async Task<ApiResponse<string>> LogoutAsync(string refreshToken)
         {
             // Find the refresh token in database

@@ -1,0 +1,51 @@
+# Auth Module: Detailed Flow Explanation
+
+This document explains how the security and login system (Authentication) works in **MediCore HMS**. You can use this to explain the technical flow during your project review.
+
+## 1. Simple Flow Diagram
+
+```mermaid
+graph TD
+    A[User enters Email & Password] --> B{Backend: AuthController}
+    B --> C[Verify User in Database]
+    C --> D{Is Password Correct? BCrypt}
+    D -- No --> E[Return 'Invalid Credentials' Error]
+    D -- Yes --> F[Generate Two Keys]
+    F --> G[Access Token - lasts 15 mins]
+    F --> H[Refresh Token - saved in DB]
+    G --> I[Sent back to Frontend]
+    H --> I
+    I --> J[User is 'Logged In']
+    J --> K[Frontend sends Access Token in every Request]
+```
+
+## 2. The Step-by-Step Details
+
+### A. Registration Flow (Joining the System)
+1. **Details Grouped**: User provides Name, Email, Phone, and selects a **Role** (Patient, Doctor, etc.).
+2. **Password Sealing**: The backend doesn't save the actual password. Instead, it uses **BCrypt** to "seal" it (hashing). Even if someone steals the database, they cannot see your actual password.
+3. **Saving**: The user is saved in the [Users](file:///c:/Users/j.kanamarlapudi/source/repos/MediCore-HMS/frontend/src/app/modules/dashboard/admin/admin-dashboard.component.ts#1833-1846) table and linked to their [Role](file:///c:/Users/j.kanamarlapudi/source/repos/MediCore-HMS/backend/Modules/Auth/Models/Role.cs#5-15).
+
+### B. Login Flow (Getting the Keys)
+1. **Finding the User**: When you type your email, the system looks for you in the database.
+2. **The "Key Match"**: It compares your typed password with the "sealed" version in the DB.
+3. **Issuing ID Cards**:
+   - **Access Token**: This is your digital ID card. It's very secure but only lasts **15 minutes**.
+   - **Refresh Token**: This is like a "Stay Logged In" ticket. It's stored in the database so the system remembers your session.
+
+### C. Accessing Protected Data
+Whenever the frontend asks for data (like "Show my Bills"), it adds the **Access Token** to the request header.
+- The server checks the token.
+- If it's valid, the server says: "I know who you are, here is your data."
+- If it's fake or old, the server says: "Access Denied."
+
+### D. Logout
+When you click Logout:
+1. The **Refresh Token** in the database is marked as "Revoked" (Invalid).
+2. The frontend clears your session.
+3. Your digital keys are now useless, and you are safely logged out.
+
+## 3. Why This is Secure?
+- **No Plain Text**: We never store actual passwords.
+- **Role-Based**: A Patient cannot see an Admin's dashboard because their token specifically says they are a 'Patient'.
+- **Safe Keys (JWT)**: The Access Tokens are encrypted and cannot be easily forged.

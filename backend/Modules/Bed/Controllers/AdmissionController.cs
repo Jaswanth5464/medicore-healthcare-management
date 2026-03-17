@@ -1,5 +1,10 @@
 using MediCore.API.Contracts.Requests;
 using MediCore.API.Contracts.Responses;
+// This file (AdmissionController) is the heart of the Patient Admission (IPD) module.
+// It handles:
+// 1. Admitting a patient to a bed and setting initial charges.
+// 2. Discharging a patient, which automatically calculates the total bill (Room rent + Service charges).
+// 3. Ensuring that a bill is generated in the Finance module when a patient leaves.
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Bed.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -51,6 +56,10 @@ namespace MediCore.API.Modules.Bed.Controllers
             return Ok(new { success = true, data = admissions });
         }
 
+        // This function admits a patient. It:
+        // 1. Finds the patient, doctor, and bed.
+        // 2. Changes the bed status to 'Occupied'.
+        // 3. Sets the initial daily room charge based on the room type selected.
         [HttpPost("admit")]
         public async Task<IActionResult> AdmitPatient([FromBody] AdmissionRequest request)
         {
@@ -115,6 +124,11 @@ namespace MediCore.API.Modules.Bed.Controllers
             }
         }
 
+        // This function discharges a patient. It:
+        // 1. Calculates how many days the patient stayed.
+        // 2. Adds up all the service charges from their stay.
+        // 3. Generates a final bill and saves it in the Finance system.
+        // 4. Changes the bed status to 'Cleaning' so it can be used again soon.
         [HttpPost("discharge")]
         public async Task<IActionResult> DischargePatient([FromBody] DischargeRequest request)
         {
@@ -214,6 +228,7 @@ namespace MediCore.API.Modules.Bed.Controllers
             }
         }
 
+        // This function retrieves all the details of a specific admission (like patient name, bed number, and doctor).
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAdmissionDetails(int id)
         {
@@ -235,6 +250,7 @@ namespace MediCore.API.Modules.Bed.Controllers
             return Ok(new { success = true, data = admission });
         }
         
+        // This function generates a printable summary for the patient when they leave.
         [HttpGet("{id}/summary")]
         public async Task<IActionResult> GetDischargeSummary(int id)
         {

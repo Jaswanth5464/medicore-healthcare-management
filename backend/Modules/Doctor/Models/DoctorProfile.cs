@@ -1,8 +1,10 @@
-﻿using MediCore.API.Modules.Auth.Models;
+using MediCore.API.Modules.Auth.Models;
 using MediCore.API.Modules.Patient.Models;
 
 namespace MediCore.API.Modules.Doctor.Models
 {
+// This model represents a Doctor's professional profile.
+// It stores their specialization, working hours, and how much they charge for a consultation.
     public class DoctorProfile
     {
         public int Id { get; set; }

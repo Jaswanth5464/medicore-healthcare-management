@@ -1,4 +1,16 @@
+/**
+ * This file (FinanceDashboardComponent) is the main screen for the Hospital Admin and Finance Staff.
+ * It provides a "Birds-eye view" of the entire hospital's financial health.
+ * 
+ * Major Features:
+ * 1. KPI Cards: Shows total invoices, pending payments, and successful collections.
+ * 2. Revenue Breakdown: Shows exactly how much money is coming from Pharmacy, Lab, OPD, and IPD.
+ * 3. Bed Occupancy: Shows a real-time progress bar of how many beds are currently in use.
+ * 4. Invoicing Center: A searchable list of all bills where staff can collect payments from patients.
+ */
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
+// This component (FinanceDashboard) is the main screen for the hospital's financial analytics.
+// It shows Today's Revenue, Pending Bills, and a breakdown of income from different departments.
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -19,6 +31,10 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
           <p>Revenue & Billing Analytics Center</p>
         </div>
         <div class="header-actions">
+          <button class="seed-btn" (click)="seedData()" *ngIf="totalBeds() === 0" [disabled]="isLoading()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            {{ isLoading() ? 'Syncing...' : 'Synchronize System' }}
+          </button>
           <div class="revenue-chip">
             <span class="dot"></span>
             <span class="label">Today's Revenue</span>
@@ -378,6 +394,10 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
     .export-btn:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 15px 30px rgba(10, 39, 68, 0.2); }
     .export-btn svg { width:18px; }
 
+    .seed-btn { background: #f59e0b; color: #fff; border: none; padding: 12px 20px; border-radius: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); transition: 0.3s; }
+    .seed-btn:hover:not(:disabled) { background: #d97706; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(245, 158, 11, 0.3); }
+    .seed-btn svg { width: 18px; }
+
     .kpi-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:24px; margin-bottom:40px; }
     .kpi-card { background:var(--card-bg); padding:28px; border-radius:var(--radius-md); border:1px solid var(--glass-border); cursor:pointer; display:flex; align-items:center; gap:20px; transition:0.3s cubic-bezier(0.16, 1, 0.3, 1); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow-md); }
     .kpi-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); border-color: var(--primary-light); }
@@ -574,6 +594,8 @@ export class FinanceDashboardComponent implements OnInit {
 
   getHeaders() { return { Authorization: `Bearer ${this.auth.getAccessToken()}` }; }
 
+  // This function fetches all financial data from the backend.
+  // It updates the cards at the top of the dashboard.
   loadData() {
     this.isLoading.set(true);
     this.http.get<any>(`${this.BASE_URL}/api/finance/stats`, { headers: this.getHeaders() }).subscribe({
@@ -680,6 +702,22 @@ export class FinanceDashboardComponent implements OnInit {
       error: () => {
         this.emailLoading.set(null);
         this.notify.error('Failed to send email.');
+      }
+    });
+  }
+
+  seedData() {
+    this.isLoading.set(true);
+    this.http.post<any>(`${this.BASE_URL}/api/finance/seed-data`, {}, { headers: this.getHeaders() }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.notify.success('Project data synchronized and seeded successfully!');
+          this.loadData();
+        }
+      },
+      error: (err) => {
+        this.notify.error(err.error?.message || 'Synchronization failed.');
+        this.isLoading.set(false);
       }
     });
   }

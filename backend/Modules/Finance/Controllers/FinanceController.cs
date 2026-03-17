@@ -1,3 +1,9 @@
+// This file (FinanceController) is the central reporting hub for the entire hospital.
+// It gathers financial data from all other modules (Pharmacy, Lab, IPD, and OPD).
+// Key Features:
+// 1. Calculates total revenue and expenses for the dashboard.
+// 2. Provides the list of all bills (invoices) where staff can collect payments.
+// 3. Generates department-wise reports to see which area is earning the most revenue.
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Finance.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +24,7 @@ namespace MediCore.API.Modules.Finance.Controllers
             _context = context;
         }
 
+        // This function gets the bills for the currently logged-in patient.
         [HttpGet("my-bills")]
         public async Task<IActionResult> GetMyBills()
         {
@@ -47,6 +54,7 @@ namespace MediCore.API.Modules.Finance.Controllers
             return Ok(new { success = true, data = bills });
         }
 
+        // This function gets all bills in the system for admins/staff to review and manage.
         [HttpGet("bills")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff,Receptionist")]
         public async Task<IActionResult> GetBills()
@@ -75,6 +83,8 @@ namespace MediCore.API.Modules.Finance.Controllers
             return Ok(new { success = true, data = bills });
         }
 
+        // This function updates a bill's status (like changing it from 'Unpaid' to 'Paid').
+        // It's the most important function for revenue tracking.
         [HttpPatch("bills/{id}/status")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff,Receptionist")]
         public async Task<IActionResult> UpdateBillStatus(int id, [FromBody] UpdateStatusDto dto)
@@ -116,6 +126,7 @@ namespace MediCore.API.Modules.Finance.Controllers
             return Ok(new { success = true, message = "Invoice sent successfully" });
         }
 
+        // This function gets a list of hospital expenses (like rent, salary, electricity).
         [HttpGet("expenses")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff")]
         public async Task<IActionResult> GetExpenses()
@@ -150,7 +161,6 @@ namespace MediCore.API.Modules.Finance.Controllers
         }
 
         [HttpGet("payment-logs")]
-
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist")]
         public async Task<IActionResult> GetPaymentLogs([FromQuery] int limit = 100)
         {
@@ -166,7 +176,7 @@ namespace MediCore.API.Modules.Finance.Controllers
                     b.BillSource,
                     b.PaymentMode,
                     PaidAt = b.PaidAt ?? b.CreatedAt,
-                    PatientName = _context.Users.Where(u => u.Id == b.PatientUserId).Select(u => u.FullName).FirstOrDefault(),
+                    PatientName = b.PatientUserId != null ? _context.Users.Where(u => u.Id == b.PatientUserId).Select(u => u.FullName).FirstOrDefault() : "Walk-in Customer",
                     DoctorName = b.DoctorProfileId != null ? _context.Users.Where(u => u.Id == _context.DoctorProfiles.Where(d => d.Id == b.DoctorProfileId).Select(d => d.UserId).FirstOrDefault()).Select(u => u.FullName).FirstOrDefault() : "N/A"
                 })
                 .ToListAsync();
@@ -174,6 +184,26 @@ namespace MediCore.API.Modules.Finance.Controllers
             return Ok(new { success = true, data = logs });
         }
 
+        [HttpPost("seed-data")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin")]
+        public async Task<IActionResult> SeedData()
+        {
+            try
+            {
+                await Infrastructure.Database.DbSeeder.SeedAsync(_context);
+                return Ok(new { success = true, message = "Database seeded successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Seed failed: " + ex.Message });
+            }
+        }
+
+        // This is the "Brain" of the Finance Dashboard. It:
+        // 1. Calculates today's, yesterday's, and this month's revenue.
+        // 2. Breaks down revenue by source (Pharmacy, Lab, IPD, OPD).
+        // 3. Counts how many beds are occupied.
+        // 4. Calculates the final profit by subtracting expenses from revenue.
         [HttpGet("stats")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,FinanceStaff")]
         public async Task<IActionResult> GetFinanceStats()
@@ -233,7 +263,13 @@ namespace MediCore.API.Modules.Finance.Controllers
             // IPD Metrics
             var totalBeds = await _context.BedAllocations.CountAsync();
             var occupiedBeds = await _context.BedAllocations.CountAsync(b => b.IsOccupied);
-            var ipdRevenueToday = await _context.Bills.Where(b => b.BillSource == "IPD" && b.CreatedAt.Date == today).SumAsync(b => b.TotalAmount);
+            
+            // Consistent IPD revenue calculation (only paid bills counted as revenue)
+            var ipdRevenueToday = await _context.Bills
+                .Where(b => b.BillSource == "IPD" && b.Status == "Paid" && 
+                       ((b.PaidAt != null && b.PaidAt.Value.Date == today) || 
+                        (b.PaidAt == null && b.CreatedAt.Date == today)))
+                .SumAsync(b => b.TotalAmount);
 
             // Expenses
             var totalExpenses = await _context.Expenses.SumAsync(e => e.Amount);

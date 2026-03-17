@@ -58,7 +58,7 @@ namespace MediCore.API.Modules.Auth.Controllers
                 return BadRequest(result);
             return Ok(result);
         }
-
+      //used to logout from all devices 
         [HttpPost("revoke-all")]
         [Authorize]
         public async Task<IActionResult> RevokeAll()

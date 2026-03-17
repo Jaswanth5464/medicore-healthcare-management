@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
-
+//A Hub in SignalR is a central server component that enables real-time communication between connected users. It acts like a smart middleman where all clients (such as doctors, patients, receptionists, and lab staff) connect, and through it they can instantly send and
+// receive messages without refreshing the page. When a user connects, the Hub registers them and can track whether they are online; 
+//when they disconnect, it updates their status. It allows communication in different ways, such as sending messages to a specific user (private chat), to a group (like a department), or to everyone (broadcast alerts). In your project, the Hub is also used for
+// advanced features like typing indicators and video/audio calling, where it helps exchange connection data between users so they can establish a direct peer-to-peer connection. Overall, the Hub does not store or process heavy data—it mainly
+// routes messages quickly and efficiently, making your application feel live and interactive, like WhatsApp or a video calling app
 namespace MediCore.API.Hubs
 {
     [Authorize]

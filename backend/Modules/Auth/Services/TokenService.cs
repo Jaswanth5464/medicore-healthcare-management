@@ -22,6 +22,8 @@ namespace MediCore.API.Modules.Auth.Services
             _configuration = configuration;
         }
 
+        // This function creates the JWT (Access Token).
+        // It packs the User ID, Email, and Role into a signed, secure string.
         public string GenerateAccessToken(User user)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
@@ -60,6 +62,7 @@ namespace MediCore.API.Modules.Auth.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
+        // This function creates a long-lived random string used to refresh the user's session.
         public string GenerateRefreshToken()
         {
             // Generates a cryptographically secure random token

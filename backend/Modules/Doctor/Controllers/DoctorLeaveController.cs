@@ -1,3 +1,5 @@
+// This file (DoctorLeaveController) handles leave requests for doctors.
+// Doctors can apply for leave, and admins can approve or reject those requests.
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Doctor.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +20,7 @@ namespace MediCore.API.Modules.Doctor.Controllers
             _context = context;
         }
 
+        // This function lets a doctor see their previous and upcoming leave requests.
         [HttpGet("my")]
         [Authorize(Roles = "Doctor")]
         public async Task<IActionResult> GetMyLeaves()
@@ -38,6 +41,7 @@ namespace MediCore.API.Modules.Doctor.Controllers
             return Ok(new { success = true, data = leaves });
         }
 
+        // This function lets a doctor submit a new leave request.
         [HttpPost]
         [Authorize(Roles = "Doctor")]
         public async Task<IActionResult> CreateLeave([FromBody] CreateLeaveDto dto)
@@ -93,6 +97,7 @@ namespace MediCore.API.Modules.Doctor.Controllers
 
         // --- ADMIN ENDPOINTS ---
 
+        // This function is for admins to see every leave request in the hospital.
         [HttpGet("all")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin")]
         public async Task<IActionResult> GetAllLeaves()
@@ -119,6 +124,7 @@ namespace MediCore.API.Modules.Doctor.Controllers
             return Ok(new { success = true, data = leaves });
         }
 
+        // This function lets an admin Approve or Reject a leave request.
         [HttpPatch("{id}/status")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin")]
         public async Task<IActionResult> UpdateLeaveStatus(int id, [FromBody] UpdateLeaveStatusDto dto)

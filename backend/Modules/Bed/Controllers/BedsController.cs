@@ -1,3 +1,5 @@
+// This file (BedsController) handles all requests related to hospital beds in the IPD (In-Patient Department).
+// Its main job is to let the hospital staff update a bed's status (like changing it from 'Cleaning' back to 'Available').
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Bed.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +20,7 @@ namespace MediCore.API.Modules.Bed.Controllers
             _context = context;
         }
 
+        // This function searches for a bed by its ID and changes its status (like from 'Cleaning' to 'Available').
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateBedStatus(int id, [FromBody] UpdateBedStatusDto dto)
         {

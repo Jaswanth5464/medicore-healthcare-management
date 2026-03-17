@@ -3,6 +3,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MediCore.API.Modules.Bed.Models
 {
+// This model represents a Hospital Room. 
+// A room can have multiple beds and belongs to a specific Room Type (like General Ward or Private Suite).
     public class Room
     {
         [Key]

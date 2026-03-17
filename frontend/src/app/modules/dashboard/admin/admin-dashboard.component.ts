@@ -1,4 +1,6 @@
 import { Component, signal, computed, OnInit, inject } from '@angular/core';
+// This component (AdminDashboard) is the bird's-eye view for hospital managers.
+// It tracks total patients, doctor availability, and overall hospital performance.
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';

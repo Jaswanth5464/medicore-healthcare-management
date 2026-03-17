@@ -3,6 +3,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MediCore.API.Modules.Bed.Models
 {
+// This model represents a specific Bed in the hospital.
+// It tracks which room the bed is in, its current status (Occupied, Cleaning, etc.), and which patient is currently using it.
     public class BedAllocation
     {
         [Key]

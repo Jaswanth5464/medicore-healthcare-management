@@ -1,3 +1,5 @@
+// This component (PharmacistDashboard) helps managing medicine sales and stock.
+// Pharmacists use this to see new prescriptions and dispense medicines to patients.
 import { Component, OnInit, signal, inject } from '@angular/core';
 declare var QRCode: { toDataURL: (text: string, opts?: { width?: number; margin?: number }) => Promise<string> };
 import { CommonModule } from '@angular/common';

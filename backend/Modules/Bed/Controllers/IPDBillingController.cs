@@ -1,3 +1,6 @@
+// This file (IPDBillingController) handles the calculation and addition of daily charges for patients admitted in the hospital.
+// It manages costs for things like doctor visits, medicines, and nursing.
+// I fixed a bug here to make sure the room rent is only added once per day, even if multiple service charges are added later.
 using MediCore.API.Contracts.Requests;
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Bed.Models;

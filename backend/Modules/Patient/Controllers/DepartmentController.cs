@@ -1,4 +1,5 @@
-﻿using MediCore.API.Infrastructure.Database.Context;
+// This file (DepartmentController) handles the different medical departments in the hospital (like Cardiology, Neurology).
+using MediCore.API.Infrastructure.Database.Context;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ namespace MediCore.API.Modules.Patient.Controllers
             _context = context;
         }
 
-        // GET api/departments — Public, no auth needed
+        // This function gets a list of all hospital departments.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {

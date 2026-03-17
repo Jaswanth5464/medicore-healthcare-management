@@ -1,7 +1,8 @@
-﻿using MediCore.API.Modules.Doctor.Models;
+using MediCore.API.Modules.Doctor.Models;
 namespace MediCore.API.Modules.Patient.Models
 
 {
+// This model represents a Medical Department (e.g., Dental, Pediatrics).
     public class Department
     {
         public int Id { get; set; }

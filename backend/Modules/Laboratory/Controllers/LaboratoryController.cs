@@ -29,7 +29,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             _hubContext = hubContext;
         }
 
-        // GET api/laboratory/orders
+        // This function gets all lab orders that are waiting to be processed or completed.
         [HttpGet("orders")]
         public async Task<IActionResult> GetOrders([FromQuery] string? status = null)
         {
@@ -50,12 +50,14 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                 l.CreatedAt,
                 l.CompletedAt,
                 l.Priority,
+                l.Price,
                 l.ReferenceRange,
                 l.SampleCollectedAt,
                 PatientName = _context.Users.Where(u => u.Id == l.PatientUserId).Select(u => u.FullName).FirstOrDefault(),
                 DoctorName = _context.DoctorProfiles.Where(d => d.Id == l.DoctorProfileId)
                     .Select(d => _context.Users.Where(u => u.Id == d.UserId).Select(u => u.FullName).FirstOrDefault())
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                IsPaid = _context.Bills.Any(b => b.BillSource == "Laboratory" && b.SourceReferenceId == l.Id && b.Status == "Paid")
             }).ToListAsync();
 
             return Ok(new { success = true, data = result });
@@ -113,40 +115,36 @@ namespace MediCore.API.Modules.Laboratory.Controllers
         }
 
         // PATCH api/laboratory/orders/{id}/complete
-        [HttpPatch("orders/{id}/complete")]
+        // This function completes a lab test order. It:
+        // 1. Records the results of the test.
+        // 2. Changes the order status to 'Completed'.
+        // 3. Automatically generates a "Paid" bill for the finance system.
+        [HttpPost("orders/{id}/complete")]
+        [Authorize(Roles = "SuperAdmin,HospitalAdmin,LabTechnician")]
         public async Task<IActionResult> CompleteOrder(int id, [FromBody] CompleteOrderDto dto)
         {
             var order = await _context.LabOrders.FindAsync(id);
             if (order == null) return NotFound(new { success = false, message = "Order not found" });
 
-            // Calculate test price from master
-            var testMaster = await _context.LabTestMasters.FirstOrDefaultAsync(t => t.TestName == order.TestType);
-            decimal price = testMaster?.Price ?? 0;
+            // Ensure test price is up to date if not already set
+            if (order.Price == 0)
+            {
+                var testMaster = await _context.LabTestMasters.FirstOrDefaultAsync(t => t.TestName == order.TestType);
+                order.Price = testMaster?.Price ?? 0;
+            }
 
             order.Status = "Completed";
             order.ResultNotes = dto.ResultNotes;
             order.ReportUrl = dto.ReportUrl;
-            order.ReferenceRange = testMaster?.NormalRange;
             order.CompletedAt = DateTime.UtcNow;
 
-            // Create Bill for Lab
-            var bill = new Bill
+            // Update existing bill if it exists and is not yet paid (fallback)
+            var bill = await _context.Bills.FirstOrDefaultAsync(b => b.BillSource == "Laboratory" && b.SourceReferenceId == order.Id);
+            if (bill != null && bill.Status != "Paid")
             {
-                BillNumber = $"LAB-{DateTime.UtcNow:yyyyMMdd}-{order.Id}",
-                AppointmentId = order.AppointmentId,
-                PatientUserId = order.PatientUserId,
-                DoctorProfileId = order.DoctorProfileId,
-                BillSource = "Laboratory",
-                SourceReferenceId = order.Id,
-                Items = $"[{{\"name\": \"{order.TestType}\", \"price\": {price}}}]",
-                SubTotal = price,
-                TotalAmount = price,
-                Status = "Paid", // Lab tests usually paid at time of collection
-                PaymentMode = "Cash",
-                PaidAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.Bills.Add(bill);
+                bill.Status = "Paid";
+                bill.PaidAt = DateTime.UtcNow;
+            }
 
             await _context.SaveChangesAsync();
 
@@ -162,7 +160,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                         orderId = order.Id, 
                         patientName = patientName, 
                         testType = order.TestType,
-                        billAmount = price
+                        billAmount = order.Price
                     });
             }
 
@@ -171,10 +169,10 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                 .SendAsync("LabReportReady", new { 
                     orderId = order.Id, 
                     testType = order.TestType,
-                    billAmount = price
+                    billAmount = order.Price
                 });
 
-            return Ok(new { success = true, message = "Lab results updated and bill generated successfully", billAmount = price });
+            return Ok(new { success = true, message = "Lab results updated and bill synchronized successfully", billAmount = order.Price });
         }
 
         // POST api/laboratory/orders/{id}/email

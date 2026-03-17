@@ -2,6 +2,7 @@ using MediCore.API.Modules.Auth.Models;
 
 namespace MediCore.API.Modules.Patient.Models
 {
+// This model stores additional details about a patient, such as their blood group and emergency contact.
     public class PatientProfile
     {
         public int Id { get; set; }

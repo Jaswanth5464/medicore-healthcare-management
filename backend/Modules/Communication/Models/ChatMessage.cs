@@ -1,5 +1,7 @@
 using System;
 
+// This model represents a single Chat Message.
+// It stores who sent the message, who received it, and the actual text content.
 namespace MediCore.API.Modules.Communication.Models
 {
     public class ChatMessage

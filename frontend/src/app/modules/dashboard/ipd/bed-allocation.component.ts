@@ -1,4 +1,6 @@
 import { Component, signal, computed, OnInit, inject } from '@angular/core';
+// This component (BedAllocation) shows a map of all hospital rooms and beds.
+// It allows staff to see which beds are free, which are occupied, and which need cleaning.
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { IpdService } from '../../../core/services/ipd.service';

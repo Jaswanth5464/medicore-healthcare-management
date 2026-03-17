@@ -1,3 +1,5 @@
+// This file (AppointmentController) is the engine for managing patient visits.
+// It handles everything from booking an appointment to tracking the patient's status (like 'Scheduled' or 'With Doctor').
 using MediCore.API.Infrastructure.Database.Context;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,6 +34,7 @@ namespace MediCore.API.Modules.OPD.Controllers
         }
 
         // GET api/appointments/today
+        // This function gets the list of all patients who have an appointment today.
         [HttpGet("today")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist,Doctor,Nurse")]
         public async Task<IActionResult> GetToday([FromQuery] int? doctorProfileId = null)
@@ -245,6 +248,9 @@ namespace MediCore.API.Modules.OPD.Controllers
 
 
         // PATCH api/appointments/5/status
+        // This is a CRITICAL function. It updates the status of an appointment.
+        // For example, when a patient arrives, it changes status to 'CheckedIn'.
+        // When the doctor is finished, it changes to 'Completed' and AUTOMATICALLY generates a bill.
         [HttpPatch("{id}/status")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist,Doctor,Nurse")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateAppointmentStatusDto dto)
@@ -400,6 +406,7 @@ namespace MediCore.API.Modules.OPD.Controllers
             return Ok(new { success = true, message = $"Status updated to {dto.Status}" });
         }
 
+        // This function records that a patient has paid their consultation fee.
         [HttpPatch("{id}/payment")]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist,Patient")]
         public async Task<IActionResult> UpdatePayment(int id, [FromBody] UpdatePaymentDto dto)
@@ -688,6 +695,8 @@ namespace MediCore.API.Modules.OPD.Controllers
         }
 
         // POST api/appointments — Create appointment (existing patient OR walk-in)
+        // This function creates a new appointment.
+        // It works for both registered patients and "Walk-in" patients.
         [HttpPost]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin,Receptionist,Doctor,Patient")]
         public async Task<IActionResult> CreateAppointment([FromBody] CreateAppointmentDto dto)
@@ -798,7 +807,8 @@ namespace MediCore.API.Modules.OPD.Controllers
 
         // GET api/appointments/slots
         // Get available slots for a doctor on a date
-        [HttpGet("slots")]
+        // This function saves the medicine prescription written by the doctor.
+        [HttpPost("prescription")]
         public async Task<IActionResult> GetAvailableSlots(
             [FromQuery] int doctorProfileId,
             [FromQuery] DateTime date)

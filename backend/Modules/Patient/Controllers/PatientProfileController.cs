@@ -1,5 +1,6 @@
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Patient.Models;
+// This file (PatientProfileController) manages patient-specific information like their Blood Group and Date of Birth.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,7 @@ namespace MediCore.API.Modules.Patient.Controllers
             _context = context;
         }
 
+        // This function lets a logged-in patient view their own detailed profile.
         [HttpGet("my")]
         [Authorize(Roles = "Patient")]
         public async Task<IActionResult> GetMyProfile()

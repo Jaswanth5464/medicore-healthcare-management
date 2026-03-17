@@ -4,6 +4,8 @@ using MediCore.API.Modules.Auth.Models;
 
 namespace MediCore.API.Modules.Bed.Models
 {
+// This model records the costs incurred by a patient for a single day.
+// It tracks room rent, doctor visits, and other services so they can be added to the final bill.
     public class DailyIPDCharge
     {
         [Key]

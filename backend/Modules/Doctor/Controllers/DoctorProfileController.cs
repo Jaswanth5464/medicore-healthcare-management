@@ -1,3 +1,5 @@
+// This file (DoctorProfileController) manages all doctor-related information.
+// It allows the system to list doctors, view individual profiles, and update their specializations or consultation fees.
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Doctor.Models;
 using MediCore.API.Modules.Patient.Models;
@@ -21,6 +23,8 @@ namespace MediCore.API.Modules.Doctor.Controllers
         }
 
         // GET api/doctors
+        // This function retrieves a list of all active doctors.
+        // It can also filter doctors by their department (like 'Cardiology' or 'Orthopedics').
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] int? departmentId = null)
         {
@@ -61,6 +65,7 @@ namespace MediCore.API.Modules.Doctor.Controllers
             return Ok(new { success = true, data = doctors });
         }
         // GET api/doctors/my
+        // This function lets a logged-in doctor view their own profile.
         [HttpGet("my")]
         [Authorize(Roles = "Doctor,Mentor")]
         public async Task<IActionResult> GetMyProfile()
@@ -105,6 +110,8 @@ namespace MediCore.API.Modules.Doctor.Controllers
         }
 
         // POST api/doctors — Create doctor profile
+        // This function is for admins to create a new doctor's profile.
+        // It sets their working hours, fees, and bio.
         [HttpPost]
         [Authorize(Roles = "SuperAdmin,HospitalAdmin")]
         public async Task<IActionResult> Create([FromBody] CreateDoctorProfileDto dto)

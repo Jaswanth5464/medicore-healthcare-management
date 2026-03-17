@@ -204,55 +204,45 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
 
       </main>
 
-      <!-- Results Modal -->
-      <div class="modal-overlay" *ngIf="selectedOrder()">
+      <!-- New Test Master Modal -->
+      <div class="modal-overlay" *ngIf="showNewTestForm()">
         <div class="modal-card">
           <div class="modal-head">
-            <h3>Diagnostic Results Entry</h3>
-            <button class="btn-close" (click)="selectedOrder.set(null)">&times;</button>
+            <h3>Add New Test Specification</h3>
+            <button class="btn-close" (click)="showNewTestForm.set(false)">&times;</button>
           </div>
           <div class="modal-body">
-            <div class="order-summary-box">
-              <div class="os-col"><span>Patient:</span> <strong>{{ selectedOrder()?.patientName }}</strong></div>
-              <div class="os-col"><span>Test:</span> <strong>{{ selectedOrder()?.testType }}</strong></div>
-            </div>
-
-            <div class="results-table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Parameter (Unit)</th>
-                    <th>Result Value</th>
-                    <th>Reference Range</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let res of labResults(); let i = index">
-                    <td><input [(ngModel)]="res.parameter" placeholder="e.g. Platelets (10^3/uL)"></td>
-                    <td><input [(ngModel)]="res.value" class="val-input" placeholder="Value"></td>
-                    <td><input [(ngModel)]="res.normalRange" placeholder="e.g. 150 - 450"></td>
-                    <td><button (click)="removeResultRow(i)" class="btn-del">&times;</button></td>
-                  </tr>
-                </tbody>
-              </table>
-              <button class="btn-add-row" (click)="addResultRow()">+ Add Parameter</button>
-            </div>
-
-            <div class="notes-area">
-              <label>Interpretation & Notes</label>
-              <textarea [(ngModel)]="uploadData.resultNotes" rows="3" placeholder="Clinical findings and remarks..."></textarea>
-            </div>
-
-            <div class="critical-flag">
-              <input type="checkbox" id="crit-val" [(ngModel)]="uploadData.isCritical">
-              <label for="crit-val">MARK AS CRITICAL (Sends immediate alert to Doctor)</label>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Test Code</label>
+                <input [(ngModel)]="newTest.testCode" placeholder="e.g. CBC-01">
+              </div>
+              <div class="form-group">
+                <label>Test Name</label>
+                <input [(ngModel)]="newTest.testName" placeholder="e.g. Complete Blood Count">
+              </div>
+              <div class="form-group">
+                <label>Price (₹)</label>
+                <input type="number" [(ngModel)]="newTest.price" placeholder="500">
+              </div>
+              <div class="form-group">
+                <label>TAT (Hours)</label>
+                <input type="number" [(ngModel)]="newTest.turnaroundTimeHours" placeholder="24">
+              </div>
+              <div class="form-group full">
+                <label>Normal/Reference Range</label>
+                <input [(ngModel)]="newTest.normalRange" placeholder="e.g. 13.5 - 17.5 g/dL">
+              </div>
+              <div class="form-group full">
+                <label>Description/Notes</label>
+                <textarea [(ngModel)]="newTest.description" rows="2" placeholder="Brief details about the test..."></textarea>
+              </div>
             </div>
           </div>
           <div class="modal-foot">
-            <button class="btn-cancel" (click)="selectedOrder.set(null)">Discard</button>
-            <button class="btn-submit" (click)="submitReport()" [disabled]="isUploading()">
-              {{ isUploading() ? 'Processing...' : 'Confirm & Publish Report' }}
+            <button class="btn-cancel" (click)="showNewTestForm.set(false)">Cancel</button>
+            <button class="btn-submit" (click)="createNewTestMaster()" [disabled]="isUploading()">
+              {{ isUploading() ? 'Saving...' : 'Add to Catalog' }}
             </button>
           </div>
         </div>
@@ -261,8 +251,8 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
   `,
   styles: [`
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-    :host { display:block; height:100vh; overflow:hidden; font-family:'Outfit',sans-serif; background:#f0f2f5; }
-    .lab-container { height:100vh; display:flex; flex-direction:column; padding:24px; box-sizing:border-box; }
+    :host { display:block; height:100vh; width: 100%; overflow:hidden; font-family:'Outfit',sans-serif; background:#f0f2f5; }
+    .lab-container { height:100vh; width: 100%; display:flex; flex-direction:column; padding:24px; box-sizing:border-box; overflow: hidden; }
     
     .lab-header { background:#fff; border-radius:24px; padding:20px 32px; box-shadow:0 4px 20px rgba(0,0,0,0.03); margin-bottom:24px; }
     .header-content { display:flex; justify-content:space-between; align-items:center; }
@@ -292,78 +282,23 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
     .lab-nav button svg { width:20px; }
     .lab-nav button.active { background:#1e1b4b; color:#fff; }
 
-    .lab-content { flex:1; background:#fff; border-radius:24px; border:1px solid #e2e8f0; display:flex; flex-direction:column; overflow:hidden; }
+    .lab-content { flex:1; background:#fff; border-radius:24px; border:1px solid #e2e8f0; display:flex; flex-direction:column; overflow:hidden; min-height: 0; }
+    .queue-container, .registry-container { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
     .content-header { padding:24px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; }
     .content-header h3 { margin:0; font-size:20px; color:#1e1b4b; }
     .filters { display:flex; gap:12px; }
     .filters input { padding:10px 16px; border:1px solid #e2e8f0; border-radius:12px; width:300px; font-size:14px; }
     .filters select { padding:10px 16px; border:1px solid #e2e8f0; border-radius:12px; font-size:14px; background:#f8fafc; }
 
-    .table-frame { flex:1; overflow-y:auto; }
-    table { width:100%; border-collapse:collapse; }
-    th { text-align:left; padding:16px 24px; background:#f8fafc; font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:1px; position:sticky; top:0; z-index:10; }
-    td { padding:16px 24px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-    .order-id { font-family:monospace; font-weight:700; color:#6366f1; background:#f5f3ff; padding:4px 8px; border-radius:6px; font-size:13px; }
-    .time { font-size:12px; color:#94a3b8; }
-    .p-name { display:block; font-weight:600; color:#1e1b4b; }
-    .p-meta { font-size:12px; color:#64748b; }
-    .test-name { display:block; font-weight:600; color:#4338ca; }
-    .doc-name { font-size:11px; color:#94a3b8; text-transform:uppercase; }
+    .registry-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px; padding:24px; overflow-y:auto; flex:1; scrollbar-width: thin; }
+    .table-frame { flex:1; overflow-y:auto; scrollbar-width: thin; }
     
-    .priority-pill { font-size:11px; font-weight:700; padding:4px 10px; border-radius:100px; text-transform:uppercase; }
-    .priority-pill.stat { background:#fee2e2; color:#dc2626; border:1px solid #fecaca; }
-    .priority-pill.urgent { background:#fef3c7; color:#d97706; }
-    .priority-pill.regular { background:#f1f5f9; color:#64748b; }
-
-    .pay-chip { font-size:11px; font-weight:700; padding:4px 10px; border-radius:6px; }
-    .pay-chip.paid { background:#dcfce7; color:#166534; }
-    .pay-chip.pending { background:#f1f5f9; color:#dc2626; }
-
-    .status-indicator { display:flex; align-items:center; gap:8px; }
-    .status-dot { width:8px; height:8px; border-radius:50%; }
-    .status-dot.requested { background:#6366f1; box-shadow:0 0 8px #6366f1; }
-    .status-dot.processing { background:#f59e0b; box-shadow:0 0 8px #f59e0b; }
-    .status-dot.completed { background:#10b981; }
-    .status-text { font-size:13px; font-weight:600; color:#1e1b4b; text-transform:capitalize; }
-
-    .action-btns button { padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; transition:0.2s; border:none; }
-    .btn-collect { background:#1e1b4b; color:#fff; }
-    .btn-collect:disabled { opacity:0.5; cursor:not-allowed; }
-    .btn-complete { background:#8b5cf6; color:#fff; }
-    .btn-view { background:#f1f5f9; color:#1e1b4b; }
-
-    /* Modal Styling */
-    .modal-overlay { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.6); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; z-index:1000; }
-    .modal-card { background:#fff; width:600px; border-radius:32px; box-shadow:0 30px 60px -12px rgba(0,0,0,0.3); overflow:hidden; animation:slideUp 0.4s ease; }
-    .modal-head { padding:24px 32px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; }
-    .modal-head h3 { margin:0; font-size:22px; font-weight:700; color:#1e1b4b; }
-    .btn-close { background:none; border:none; font-size:32px; color:#94a3b8; cursor:pointer; }
-    .modal-body { padding:32px; }
-    .order-summary-box { background:#f5f3ff; padding:20px; border-radius:20px; display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; border:1px solid #e0e7ff; }
-    .os-col span { display:block; font-size:12px; color:#6366f1; text-transform:uppercase; font-weight:600; }
-    .os-col strong { display:block; font-size:18px; color:#1e1b4b; margin-top:4px; }
-
-    .results-table-container { margin-bottom:24px; }
-    .results-table-container table { width:100%; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:12px; }
-    .results-table-container th { background:#f8fafc; color:#64748b; font-size:11px; padding:12px; }
-    .results-table-container td { padding:8px; border-bottom:1px solid #f1f5f9; }
-    .results-table-container input { width:100%; border:1px solid #e2e8f0; padding:8px; border-radius:8px; font-size:13px; transition:0.2s; }
-    .results-table-container input:focus { border-color:#6366f1; outline:none; background:#f5f3ff; }
-    .val-input { font-weight:700; color:#1e1b4b; background:#f0f9ff !important; border-color:#bae6fd !important; }
-    .btn-del { border:none; background:#fee2e2; color:#dc2626; width:28px; height:28px; border-radius:50%; cursor:pointer; }
-    .btn-add-row { background:#f1f5f9; color:#6366f1; border:none; padding:8px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:12px; }
-
-    .notes-area label { display:block; font-size:12px; font-weight:700; text-transform:uppercase; color:#64748b; margin-bottom:8px; }
-    .notes-area textarea { width:100%; border:1px solid #e2e8f0; border-radius:12px; padding:12px; font-family:inherit; font-size:14px; resize:none; }
-    .critical-flag { margin-top:20px; background:#fef2f2; padding:16px; border-radius:12px; display:flex; align-items:center; gap:12px; border:1px solid #fecaca; }
-    .critical-flag input { width:20px; height:20px; accent-color:#dc2626; }
-    .critical-flag label { font-size:13px; font-weight:700; color:#dc2626; }
-
-    .modal-foot { padding:24px 32px; background:#f8fafc; display:flex; justify-content:flex-end; gap:16px; }
-    .btn-cancel { background:none; border:none; font-weight:600; color:#64748b; cursor:pointer; }
-    .btn-submit { background:#1e1b4b; color:#fff; border:none; padding:12px 32px; border-radius:14px; font-weight:700; cursor:pointer; box-shadow:0 10px 15px -3px rgba(30,27,75,0.2); }
-
-    .registry-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px; padding:24px; overflow-y:auto; flex:1; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: span 2; }
+    .form-group label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; }
+    .form-group input, .form-group textarea { padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 14px; outline: none; transition: 0.2s; }
+    .form-group input:focus, .form-group textarea:focus { border-color: #6366f1; background: #f5f3ff; }
     .test-card { background:#fff; border:1px solid #e2e8f0; border-radius:20px; padding:20px; transition:0.3s; }
     .test-card:hover { border-color:#6366f1; transform:translateY(-2px); }
     .test-card-head { display:flex; justify-content:space-between; margin-bottom:12px; }
@@ -406,6 +341,7 @@ export class LabDashboardComponent implements OnInit {
   labResults = signal<any[]>([]);
   uploadData = { reportPdfUrl: '', resultNotes: '', isCritical: false, resultsJson: '' };
   showNewTestForm = signal(false);
+  newTest = { testCode: '', testName: '', price: 0, turnaroundTimeHours: 24, normalRange: '', description: '' };
 
   ngOnInit() {
     this.loadQueue();
@@ -494,5 +430,23 @@ export class LabDashboardComponent implements OnInit {
   viewReport(url: string) {
     if (url) window.open(url, '_blank');
     else this.ns.info('No PDF report generated yet.');
+  }
+
+  createNewTestMaster() {
+    if (!this.newTest.testName || !this.newTest.testCode) {
+      this.ns.error('Please fill in test name and code.');
+      return;
+    }
+    this.isUploading.set(true);
+    this.http.post<any>(`${this.BASE_URL}/api/laboratory/tests`, this.newTest, { headers: this.getHeaders() }).subscribe({
+      next: (res) => {
+        this.isUploading.set(false);
+        this.showNewTestForm.set(false);
+        this.ns.success('New test specification added to catalog.');
+        this.loadTestMasters();
+        this.newTest = { testCode: '', testName: '', price: 0, turnaroundTimeHours: 24, normalRange: '', description: '' };
+      },
+      error: () => this.isUploading.set(false)
+    });
   }
 }

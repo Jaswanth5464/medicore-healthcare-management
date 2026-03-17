@@ -1,5 +1,7 @@
 namespace MediCore.API.Modules.OPD.Models
 {
+// This model represents a Medical Prescription.
+// It stores the diagnosis and a list of medicines (in JSON format) for the patient to take.
     public class Prescription
     {
         public int Id { get; set; }

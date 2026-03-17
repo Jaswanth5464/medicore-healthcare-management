@@ -1,3 +1,5 @@
+// This background service runs AUTOMATICALLY every few minutes.
+// It sends appointment reminders to patients and alerts admins if medicine stock is low.
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Services;
 using Microsoft.EntityFrameworkCore;

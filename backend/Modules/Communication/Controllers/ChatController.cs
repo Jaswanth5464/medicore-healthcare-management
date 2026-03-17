@@ -1,3 +1,5 @@
+// This file (ChatController) manages the real-time chat between staff and patients.
+// It allows users to send messages, view chat history, and see who is online.
 using MediCore.API.Infrastructure.Database.Context;
 using MediCore.API.Modules.Communication.Models;
 using Microsoft.AspNetCore.Authorization;

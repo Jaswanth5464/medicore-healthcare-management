@@ -1,0 +1,34 @@
+MEDI-CORE HMS: AUTHENTICATION MODULE FLOW
+========================================
+
+This is a simple explanation of how users log in and stay secure in the system.
+
+1. REGISTRATION (Signing Up)
+----------------------------
+- You provide your Name, Email, and Phone.
+- You choose a Role (like Patient or Doctor).
+- The system takes your password and "hashes" it (turns it into a secret code).
+- We never store your actual password—only the secret code.
+
+2. LOGIN (Getting access)
+-------------------------
+- When you type your email and password, the system checks if they match the secret code in the database.
+- If they match, the system gives you two "Digital Keys":
+    a) ACCESS TOKEN: This is your ID card. It allows you to see data. It is very secure but only lasts 15 minutes.
+    b) REFRESH TOKEN: This is a "Stay Logged In" ticket. It is saved in the database so the system remembers you.
+
+3. ACCESSING DATA
+-----------------
+- Every time your browser asks for information (like "Show my appointments"), it automatically sends your "Access Token" to the server.
+- The server checks the token. If it's valid, it sends the data. If not, it says "Access Denied."
+
+4. LOGOUT
+---------
+- When you logout, the "Refresh Token" in the database is destroyed (Revoked).
+- Your digital keys become useless, and you are safely signed out.
+
+SECURITY BENEFITS
+-----------------
+- Safe Passwords: No one (not even the admin) can see your real password.
+- Secure Keys: The digital tokens use high-level encryption (JWT).
+- Role Security: Patients cannot access Admin data.

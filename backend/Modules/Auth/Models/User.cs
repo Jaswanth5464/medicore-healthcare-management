@@ -2,6 +2,8 @@ using System.Data;
 
 namespace MediCore.API.Modules.Auth.Models
 {
+// This model represents a Person in our system.
+// It can be a Patient, a Doctor, or an Admin. It stores their name, email, and password.
     public class User
     {
         public int Id { get; set; }

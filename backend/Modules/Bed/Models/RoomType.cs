@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MediCore.API.Modules.Bed.Models
 {
+// This model defines the Categories of rooms (e.g., Deluxe, Semi-Private, ICU).
+// It sets the base price per day for any patient staying in this type of room.
     public class RoomType
     {
         [Key]

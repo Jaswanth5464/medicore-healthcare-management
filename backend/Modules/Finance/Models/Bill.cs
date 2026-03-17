@@ -2,6 +2,8 @@ using MediCore.API.Modules.OPD.Models;
 
 namespace MediCore.API.Modules.Finance.Models
 {
+// This model represents a Bill or Invoice.
+// It tracks who needs to pay, for which appointment or bed, and a list of all charged items.
     public class Bill
     {
         public int Id { get; set; }

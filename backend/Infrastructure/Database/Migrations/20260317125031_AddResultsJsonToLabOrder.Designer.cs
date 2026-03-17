@@ -4,16 +4,19 @@ using MediCore.API.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace MediCore.API.Migrations
+namespace MediCore.API.Infrastructure.Database.Migrations
 {
     [DbContext(typeof(MediCoreDbContext))]
-    partial class MediCoreDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260317125031_AddResultsJsonToLabOrder")]
+    partial class AddResultsJsonToLabOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

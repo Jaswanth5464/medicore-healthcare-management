@@ -141,6 +141,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             order.CompletedAt = DateTime.UtcNow;
             order.ReportUrl = dto.ReportPdfUrl;
             order.ResultsJson = dto.ResultsJson;
+            order.CriticalAlert = dto.IsCritical;
 
             // Sync with Finance: Find the unpaid bill and mark it as paid
             var bill = await _context.Bills.FirstOrDefaultAsync(b => b.BillSource == "Laboratory" && b.SourceReferenceId == order.Id);
@@ -210,6 +211,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
             public string? ResultNotes { get; set; }
             public string? ReportPdfUrl { get; set; }
             public string? ResultsJson { get; set; }
+            public bool IsCritical { get; set; }
         }
     }
 }

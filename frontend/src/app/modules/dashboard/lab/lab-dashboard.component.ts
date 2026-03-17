@@ -150,8 +150,7 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
                     <div class="action-btns">
                       <button *ngIf="order.status === 'Requested' || order.status === 'Pending'" 
                               class="btn-collect" 
-                              (click)="collectSample(order)"
-                              [disabled]="!order.isPaid && order.status !== 'Requested'">
+                              (click)="collectSample(order)">
                         Collect Sample
                       </button>
                       <button *ngIf="order.status === 'Processing'" 

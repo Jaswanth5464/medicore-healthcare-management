@@ -78,7 +78,7 @@ namespace MediCore.API.Modules.OPD.Controllers
             var testMaster = await _context.LabTestMasters.FirstOrDefaultAsync(t => t.TestName == order.TestType);
             order.Price = testMaster?.Price ?? 0;
             order.CreatedAt = DateTime.UtcNow;
-            order.Status = "Pending";
+            order.Status = "Requested";
             
             _context.LabOrders.Add(order);
             await _context.SaveChangesAsync();

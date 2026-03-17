@@ -94,7 +94,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
         public async Task<IActionResult> GetLabStats()
         {
             var totalOrders = await _context.LabOrders.CountAsync();
-            var pendingOrders = await _context.LabOrders.CountAsync(o => o.Status == "Pending");
+            var pendingOrders = await _context.LabOrders.CountAsync(o => o.Status == "Pending" || o.Status == "Requested");
             var processing = await _context.LabOrders.CountAsync(o => o.Status == "Processing");
             var completed = await _context.LabOrders.CountAsync(o => o.Status == "Completed");
 

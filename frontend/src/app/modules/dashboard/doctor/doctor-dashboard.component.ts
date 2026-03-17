@@ -728,7 +728,7 @@ export class DoctorDashboardComponent implements OnInit {
           }
           // Optional: Show a sticky toast if it's critical
           if (lastNotif.data?.isCritical) {
-            this.notify.info(`CRITICAL Lab Result for ${lastNotif.data.patientName}!`, 'Priority Alert');
+            this.notify.info(`CRITICAL Lab Result for ${lastNotif.data.patientName}!`);
           }
         }
       }

@@ -76,7 +76,7 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
         <div class="content-panel">
           
           <!-- SCHEDULE TAB -->
-          <div *ngIf="activeTab() === 'schedule'" class="fade-in">
+          <div *ngIf="activeTab() === 'schedule'" class="fade-in tab-content">
             <!-- Recent Lab Alerts Section -->
             <div class="lab-alerts-panel" *ngIf="recentLabs().length > 0">
               <div class="panel-head">
@@ -107,7 +107,7 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
           </div>
 
           <!-- LEAVES TAB -->
-          <div *ngIf="activeTab() === 'leaves'" class="fade-in">
+          <div *ngIf="activeTab() === 'leaves'" class="fade-in tab-content">
             <div class="panel">
               <div class="panel-head"><h3>Mark New Leave / Absence</h3></div>
               <div class="panel-body form-grid">
@@ -138,7 +138,7 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
           </div>
 
           <!-- CONSULTATION TAB -->
-          <div *ngIf="activeTab() === 'consultation'" class="consult-view fade-in">
+          <div *ngIf="activeTab() === 'consultation'" class="consult-view fade-in tab-content">
             <div class="consult-header">
               <div style="display:flex; align-items:center; gap:16px;">
                 <h2>Consultation — {{ consultationPatientName() }}</h2>
@@ -329,13 +329,13 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
           </div>
 
           <!-- HOSPITAL CHAT TAB -->
-          <div *ngIf="activeTab() === 'hospital-chat'" class="fade-in" style="height: calc(100vh - 200px);">
-             <app-hospital-chat></app-hospital-chat>
+          <div *ngIf="activeTab() === 'hospital-chat'" class="fade-in tab-content no-padding" style="display: flex; flex-direction: column;">
+             <app-hospital-chat style="flex: 1; min-height: 0;"></app-hospital-chat>
           </div>
 
           <!-- PATIENT CHAT TAB -->
-          <div *ngIf="activeTab() === 'patient-chat'" class="fade-in patient-chat-container">
-            <div class="chat-layout">
+          <div *ngIf="activeTab() === 'patient-chat'" class="fade-in tab-content no-padding" style="display: flex; flex-direction: column;">
+            <div class="chat-layout" style="flex: 1; min-height: 0;">
               <div class="partner-list">
                 <div class="partner-header">Patients</div>
                 <div *ngIf="loadingPartners()" class="p-4 text-center text-sm text-slate-500">Loading...</div>
@@ -362,23 +362,24 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
                   [otherUserId]="selectedPartner()!.id" 
                   [otherUserName]="selectedPartner()!.fullName"
                   [isMini]="false"
-                  (close)="selectedPartner.set(null)">
+                  (close)="selectedPartner.set(null)"
+                  style="flex: 1; min-height: 0;">
                 </app-patient-doctor-chat>
               </div>
             </div>
           </div>
 
           <!-- LAB REPORTS TAB -->
-          <div *ngIf="activeTab() === 'lab-reports'" class="fade-in lab-reports-container">
-            <div class="panel">
+          <div *ngIf="activeTab() === 'lab-reports'" class="fade-in tab-content no-padding" style="display: flex; flex-direction: column;">
+            <div class="panel" style="flex: 1; display: flex; flex-direction: column; border: none; border-radius: 0;">
               <div class="panel-head">
                 <h3><span class="icon">🔬</span> Patient Lab Results — Detailed View</h3>
                 <div class="actions">
                   <button class="small-btn refresh-pulse" (click)="loadAllLabReports()">Refresh All</button>
                 </div>
               </div>
-              <div class="panel-body">
-                <div *ngIf="allLabReports().length === 0" class="empty-msg">No lab reports found for your patients.</div>
+              <div class="panel-body" style="flex: 1; overflow-y: auto; padding: 0;">
+                <div *ngIf="allLabReports().length === 0" class="empty-msg" style="padding: 40px;">No lab reports found for your patients.</div>
                 <div class="table-frame" *ngIf="allLabReports().length > 0">
                   <table class="data-table">
                     <thead>
@@ -449,7 +450,8 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
   `,
   styles: [`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    :host { display:block; font-family:'Inter',sans-serif; background:#f4f7f6; min-height:100vh; padding:20px 24px; }
+    :host { display: block; font-family: 'Inter', sans-serif; background: #f4f7f6; height: 100vh; width: 100vw; overflow: hidden; }
+    .doctor-dash { display: flex; flex-direction: column; height: 100%; padding: 20px 24px; box-sizing: border-box; }
     * { box-sizing:border-box; margin:0; padding:0; }
     
     .header { display:flex; justify-content:space-between; align-items:center; background:#fff; padding:20px 24px; border-radius:16px; margin-bottom:20px; box-shadow:0 4px 14px rgba(0,0,0,0.03); flex-wrap:wrap; gap:12px; }
@@ -464,15 +466,17 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
     .stat-chip.pending .stat-val { color:#047857; }
     .stat-lbl { font-size:11px; color:#64748b; text-transform:uppercase; margin-top:2px; font-weight:600; }
 
-    .main-content { display:flex; gap:20px; align-items:flex-start; }
+    .main-content { display: flex; gap: 20px; align-items: stretch; flex: 1; min-height: 0; }
     
-    .sidebar { width:180px; display:flex; flex-direction:column; gap:8px; background:#fff; padding:16px; border-radius:16px; box-shadow:0 4px 14px rgba(0,0,0,0.03); flex-shrink:0; }
-    .sidebar button { text-align:left; padding:12px 16px; border:none; background:transparent; border-radius:10px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; transition:all 0.2s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .sidebar button:hover:not(:disabled) { background:#f8fafc; color:#0f172a; }
-    .sidebar button.active { background:#e0f2fe; color:#0369a1; }
-    .sidebar button:disabled { opacity:0.5; cursor:not-allowed; }
+    .sidebar { width: 180px; display: flex; flex-direction: column; gap: 8px; background: #fff; padding: 16px; border-radius: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.03); flex-shrink: 0; overflow-y: auto; }
+    .sidebar button { text-align: left; padding: 12px 16px; border: none; background: transparent; border-radius: 10px; font-size: 14px; font-weight: 600; color: #64748b; cursor: pointer; transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar button:hover:not(:disabled) { background: #f8fafc; color: #0f172a; }
+    .sidebar button.active { background: #e0f2fe; color: #0369a1; }
+    .sidebar button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .content-panel { flex:1; min-width:0; background:#fff; border-radius:16px; padding:24px; box-shadow:0 4px 14px rgba(0,0,0,0.03); overflow:auto; }
+    .content-panel { flex: 1; min-width: 0; background: #fff; border-radius: 16px; display: flex; flex-direction: column; box-shadow: 0 4px 14px rgba(0,0,0,0.03); overflow: hidden; }
+    .tab-content { flex: 1; overflow-y: auto; padding: 24px; scrollbar-width: thin; }
+    .tab-content.no-padding { padding: 0; }
     .loading { color:#64748b; font-size:14px; text-align:center; padding:40px; }
     .fade-in { animation:fadeIn 0.3s ease; }
     @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }

@@ -105,11 +105,11 @@ import { CallOverlayComponent } from './call-overlay.component';
     :host { display: block; font-family: 'Inter', sans-serif; }
 
     .chat-wrapper {
-      display: flex; flex-direction: column; height: 520px; width: 100%;
+      display: flex; flex-direction: column; height: 100%; width: 100%; min-height: 400px;
       background: #f0f4ff; background-image: radial-gradient(#dbeafe 1px, transparent 1px); background-size: 20px 20px;
       border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.12); border: 1px solid #e2e8f0;
     }
-    .chat-wrapper.mini { height: 400px; }
+    .chat-wrapper.mini { height: 400px; min-height: 400px; }
 
     .chat-header {
       padding: 16px 20px; background: #fff; border-bottom: 1px solid #e2e8f0;

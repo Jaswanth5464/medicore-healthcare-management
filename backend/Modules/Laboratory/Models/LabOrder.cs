@@ -14,6 +14,7 @@ namespace MediCore.API.Modules.Laboratory.Models
         public string Status { get; set; } = "Pending"; // Pending, Processing, Completed
         public string? ResultNotes { get; set; } // Notes from lab technician
         public string? ReportUrl { get; set; }
+        public string? ResultsJson { get; set; } // Detailed parameters and values
         public bool CriticalAlert { get; set; } = false;
 
         public string Priority { get; set; } = "Regular"; // Regular, STAT (Urgent)

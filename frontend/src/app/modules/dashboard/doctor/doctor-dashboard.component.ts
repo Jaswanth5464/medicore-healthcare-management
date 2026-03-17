@@ -73,6 +73,26 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
           
           <!-- SCHEDULE TAB -->
           <div *ngIf="activeTab() === 'schedule'" class="fade-in">
+            <!-- Recent Lab Alerts Section -->
+            <div class="lab-alerts-panel" *ngIf="recentLabs().length > 0">
+              <div class="panel-head">
+                <h3><span class="icon">🔔</span> Recent Lab Reports Ready</h3>
+                <button class="small-btn" (click)="loadRecentLabs()">Refresh</button>
+              </div>
+              <div class="alerts-scroll">
+                <div *ngFor="let alert of recentLabs()" class="lab-alert-card" (click)="openQuickView(alert)">
+                  <div class="alert-info">
+                    <strong>{{ alert.patientName }}</strong>
+                    <span>{{ alert.testType }}</span>
+                  </div>
+                  <div class="alert-meta">
+                    <span class="status-badge completed">Ready</span>
+                    <small>{{ formatDateShort(alert.completedAt) }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div *ngIf="loadingProfile()" class="loading">Loading schedule...</div>
             <app-appointment-calendar 
               *ngIf="!loadingProfile() && myProfile()"
@@ -179,13 +199,35 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
                 </div>
                 <div *ngIf="savedLabs().length > 0" class="saved-items">
                   <h4>Ordered Tests:</h4>
-                  <ul><li *ngFor="let l of savedLabs()">
-                    <span [class.font-bold]="l.criticalAlert" [class.text-red]="l.criticalAlert">{{ l.testType }}</span> - {{ l.notes }}
-                    <span *ngIf="l.status === 'Completed' && l.reportUrl">
-                      <a [href]="l.reportUrl" target="_blank" style="color: #2563eb; text-decoration: underline; font-size: 12px; margin-left: 8px;">View PDF Report</a>
-                    </span>
-                    <span *ngIf="l.status !== 'Completed'" style="color: #64748b; font-size: 12px; margin-left: 8px;">({{ l.status }})</span>
-                  </li></ul>
+                  <ul class="lab-order-list">
+                    <li *ngFor="let l of savedLabs()" class="lab-order-item">
+                      <div class="lo-header">
+                        <span class="lo-name" [class.critical]="l.criticalAlert">🧪 {{ l.testType }}</span>
+                        <span class="lo-status" [class]="l.status.toLowerCase()">{{ l.status }}</span>
+                      </div>
+                      <div class="lo-patient-tag">Patient: {{ consultationPatientName() }}</div>
+                      <p class="lo-notes">{{ l.notes }}</p>
+                      
+                      <!-- Results Table -->
+                      <div *ngIf="l.status === 'Completed' && l.resultsJson" class="lo-results">
+                        <table>
+                          <thead><tr><th>Parameter</th><th>Result</th><th>Ref Range</th></tr></thead>
+                          <tbody>
+                            <tr *ngFor="let res of parseResults(l.resultsJson)">
+                              <td>{{ res.parameter }}</td>
+                              <td class="res-val">{{ res.value }}</td>
+                              <td class="ref-range">{{ res.normalRange }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="lo-footer" *ngIf="l.status === 'Completed' && l.reportUrl">
+                        <a [href]="l.reportUrl" target="_blank" class="pdf-link">📄 View PDF Report</a>
+                        <span *ngIf="l.resultNotes" class="lo-tech-notes"><strong>Note:</strong> {{ l.resultNotes }}</span>
+                      </div>
+                    </li>
+                  </ul>
                 </div>
               </div>
 
@@ -476,6 +518,41 @@ import { VideoCallComponent } from '../../communication/video/video-call.compone
       max-width: 1400px;
       max-height: 800px;
     }
+
+    /* Lab Results Styles */
+    .lab-order-list { list-style:none; padding:0; margin-top:10px; display:flex; flex-direction:column; gap:12px; }
+    .lab-order-item { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; }
+    .lo-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .lo-name { font-weight:700; color:#1e293b; }
+    .lo-name.critical { color:#ef4444; }
+    .lo-status { font-size:10px; font-weight:700; text-transform:uppercase; padding:2px 8px; border-radius:10px; }
+    .lo-status.requested { background:#e2e8f0; color:#475569; }
+    .lo-status.processing { background:#fef3c7; color:#b45309; }
+    .lo-status.completed { background:#dcfce7; color:#166534; }
+    .lo-patient-tag { font-size:11px; font-weight:700; color:#475569; margin-bottom:6px; background:#f1f5f9; padding:2px 8px; border-radius:4px; display:inline-block; }
+    .lo-notes { font-size:12px; color:#64748b; margin:0 0 8px 0; }
+    .lo-results { margin-top:8px; background:#f8fafc; border-radius:8px; padding:8px; overflow:hidden; }
+    .lo-results table { width:100%; border-collapse:collapse; font-size:11px; }
+    .lo-results th { text-align:left; color:#64748b; padding-bottom:4px; border-bottom:1px solid #e2e8f0; }
+    .lo-results td { padding:4px 0; vertical-align:middle; border-bottom:1px dashed #f1f5f9; }
+    .res-val { font-weight:700; color:#0f172a; }
+    .ref-range { color:#94a3b8; }
+    .lo-footer { margin-top:8px; padding-top:8px; border-top:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; }
+    .pdf-link { font-size:12px; color:#2563eb; font-weight:600; text-decoration:none; }
+    .pdf-link:hover { text-decoration:underline; }
+    .lo-tech-notes { font-size:11px; color:#64748b; font-style:italic; }
+
+    /* Lab Alerts Styles */
+    .lab-alerts-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .alerts-scroll { display: flex; gap: 12px; padding: 12px; overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; }
+    .alerts-scroll::-webkit-scrollbar { display: none; }
+    .lab-alert-card { flex: 0 0 200px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+    .lab-alert-card:hover { transform: translateY(-2px); border-color: #3b82f6; background: #eff6ff; }
+    .alert-info { display: flex; flex-direction: column; }
+    .alert-info strong { font-size: 13px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .alert-info span { font-size: 11px; color: #64748b; }
+    .alert-meta { display: flex; justify-content: space-between; align-items: center; }
+    .alert-meta small { font-size: 10px; color: #94a3b8; }
   `]
 })
 export class DoctorDashboardComponent implements OnInit {
@@ -492,6 +569,7 @@ export class DoctorDashboardComponent implements OnInit {
   loadingProfile = signal(true);
   myLeaves = signal<any[]>([]);
   activeVideoRoom = signal<any>(null);
+  recentLabs = signal<any[]>([]);
 
   // Patient Chat Tab State
   chatPartners = signal<any[]>([]);
@@ -549,6 +627,7 @@ export class DoctorDashboardComponent implements OnInit {
           this.myProfile.set(res.data);
           // Load today's stats via service using doctorId
           this.state.loadToday(this.getHeaders(), res.data.id);
+          this.loadRecentLabs();
         }
         this.loadingProfile.set(false);
       },
@@ -798,10 +877,26 @@ export class DoctorDashboardComponent implements OnInit {
     }
     this.http.post<any>(`${this.BASE_URL}/api/doctor-leaves`, this.leaveForm, { headers: this.getHeaders() }).subscribe(res => {
       if (res.success) {
-        this.notify.success('Leave submitted successfully');
-        this.leaveForm = { startDate: '', endDate: '', reason: '' };
+        this.notify.success('Leave request submitted');
         this.loadLeaves();
+        this.leaveForm = { startDate: '', endDate: '', reason: '' };
       }
+    });
+  }
+
+  loadRecentLabs() {
+    if (!this.myProfile()) return;
+    this.http.get<any>(`${this.BASE_URL}/api/laboratory/orders?status=Completed&doctorProfileId=${this.myProfile().id}`, { headers: this.getHeaders() })
+      .subscribe(res => {
+        if (res.success) this.recentLabs.set(res.data.slice(0, 5));
+      });
+  }
+
+  openQuickView(alert: any) {
+    this.startConsultation({
+      appointmentId: alert.appointmentId,
+      patientName: alert.patientName,
+      patientUserId: alert.patientUserId
     });
   }
 
@@ -814,10 +909,6 @@ export class DoctorDashboardComponent implements OnInit {
         }
       });
     }
-  }
-
-  formatDateShort(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   }
 
   endConsultation() {
@@ -866,5 +957,18 @@ export class DoctorDashboardComponent implements OnInit {
   private signalR = inject(SignalRService);
   isUserOnline(userId: string): boolean {
     return this.signalR.isUserOnline(userId);
+  }
+
+  formatDateShort(dateStr: string) {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+
+  parseResults(json: string) {
+    try {
+      return JSON.parse(json || '[]');
+    } catch {
+      return [];
+    }
   }
 }

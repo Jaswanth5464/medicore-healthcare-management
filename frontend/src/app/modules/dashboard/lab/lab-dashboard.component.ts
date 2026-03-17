@@ -203,6 +203,60 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
 
       </main>
 
+      <!-- Results Modal -->
+      <div class="modal-overlay" *ngIf="selectedOrder()">
+        <div class="modal-card">
+          <div class="modal-head">
+            <h3>Diagnostic Results Entry</h3>
+            <button class="btn-close" (click)="selectedOrder.set(null)">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="order-summary-box">
+              <div class="os-col"><span>Patient:</span> <strong>{{ selectedOrder()?.patientName }}</strong></div>
+              <div class="os-col"><span>Test:</span> <strong>{{ selectedOrder()?.testType }}</strong></div>
+            </div>
+
+            <div class="results-table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Parameter (Unit)</th>
+                    <th>Result Value</th>
+                    <th>Reference Range</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let res of labResults(); let i = index">
+                    <td><input [(ngModel)]="res.parameter" placeholder="e.g. Platelets (10^3/uL)"></td>
+                    <td><input [(ngModel)]="res.value" class="val-input" placeholder="Value"></td>
+                    <td><input [(ngModel)]="res.normalRange" placeholder="e.g. 150 - 450"></td>
+                    <td><button (click)="removeResultRow(i)" class="btn-del">&times;</button></td>
+                  </tr>
+                </tbody>
+              </table>
+              <button class="btn-add-row" (click)="addResultRow()">+ Add Parameter</button>
+            </div>
+
+            <div class="notes-area">
+              <label>Interpretation & Notes</label>
+              <textarea [(ngModel)]="uploadData.resultNotes" rows="3" placeholder="Clinical findings and remarks..."></textarea>
+            </div>
+
+            <div class="critical-flag">
+              <input type="checkbox" id="crit-val" [(ngModel)]="uploadData.isCritical">
+              <label for="crit-val">MARK AS CRITICAL (Sends immediate alert to Doctor)</label>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn-cancel" (click)="selectedOrder.set(null)">Discard</button>
+            <button class="btn-submit" (click)="submitReport()" [disabled]="isUploading()">
+              {{ isUploading() ? 'Processing...' : 'Confirm & Publish Report' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- New Test Master Modal -->
       <div class="modal-overlay" *ngIf="showNewTestForm()">
         <div class="modal-card">
@@ -289,12 +343,13 @@ import { HospitalChatComponent } from '../../communication/chat/hospital-chat.co
     .filters input { padding:10px 16px; border:1px solid #e2e8f0; border-radius:12px; width:300px; font-size:14px; }
     .filters select { padding:10px 16px; border:1px solid #e2e8f0; border-radius:12px; font-size:14px; background:#f8fafc; }
 
-    .table-frame { flex:1; overflow-y:auto; scrollbar-width: thin; }
-    table { width:100%; border-collapse:collapse; }
-    th { text-align:left; padding:16px 24px; background:#f8fafc; font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:1px; position:sticky; top:0; z-index:10; }
-    td { padding:16px 24px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-    .order-id { font-family:monospace; font-weight:700; color:#6366f1; background:#f5f3ff; padding:4px 8px; border-radius:6px; font-size:13px; }
-    .time { font-size:12px; color:#94a3b8; }
+    .table-frame { flex:1; overflow-y:auto; scrollbar-width: thin; padding: 0 24px; }
+    table { width:100%; border-collapse:collapse; min-width: 1000px; }
+    th { text-align:left; padding:16px 12px; background:#f8fafc; font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:1px; position:sticky; top:0; z-index:10; }
+    td { padding:16px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; line-height: 1.4; }
+    .p-info, .test-info { display: flex; flex-direction: column; gap: 4px; }
+    .order-id { font-family:monospace; font-weight:700; color:#6366f1; background:#f5f3ff; padding:4px 8px; border-radius:6px; font-size:13px; display: inline-block; margin-bottom: 4px; }
+    .time { font-size:12px; color:#94a3b8; white-space: nowrap; }
     .p-name { display:block; font-weight:600; color:#1e1b4b; }
     .p-meta { font-size:12px; color:#64748b; }
     .test-name { display:block; font-weight:600; color:#4338ca; }

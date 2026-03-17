@@ -31,12 +31,15 @@ namespace MediCore.API.Modules.Laboratory.Controllers
 
         // This function gets all lab orders that are waiting to be processed or completed.
         [HttpGet("orders")]
-        public async Task<IActionResult> GetOrders([FromQuery] string? status = null)
+        public async Task<IActionResult> GetOrders([FromQuery] string? status = null, [FromQuery] int? doctorProfileId = null)
         {
             var query = _context.LabOrders.AsQueryable();
 
             if (!string.IsNullOrEmpty(status) && status != "All")
                 query = query.Where(l => l.Status == status);
+
+            if (doctorProfileId.HasValue)
+                query = query.Where(l => l.DoctorProfileId == doctorProfileId.Value);
 
             var result = await query.OrderByDescending(l => l.CreatedAt).Select(l => new
             {
@@ -50,7 +53,7 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                 l.CreatedAt,
                 l.CompletedAt,
                 l.Priority,
-                l.Price,
+                Price = l.Price > 0 ? l.Price : (_context.LabTestMasters.Where(t => t.TestName == l.TestType).Select(t => t.Price).FirstOrDefault()),
                 l.ReferenceRange,
                 l.SampleCollectedAt,
                 PatientName = _context.Users.Where(u => u.Id == l.PatientUserId).Select(u => u.FullName).FirstOrDefault(),
@@ -135,18 +138,22 @@ namespace MediCore.API.Modules.Laboratory.Controllers
 
             order.Status = "Completed";
             order.ResultNotes = dto.ResultNotes;
-            order.ReportUrl = dto.ReportUrl;
             order.CompletedAt = DateTime.UtcNow;
+            order.ReportUrl = dto.ReportPdfUrl;
+            order.ResultsJson = dto.ResultsJson;
 
-            // Update existing bill if it exists and is not yet paid (fallback)
+            // Sync with Finance: Find the unpaid bill and mark it as paid
             var bill = await _context.Bills.FirstOrDefaultAsync(b => b.BillSource == "Laboratory" && b.SourceReferenceId == order.Id);
-            if (bill != null && bill.Status != "Paid")
+            if (bill != null)
             {
                 bill.Status = "Paid";
                 bill.PaidAt = DateTime.UtcNow;
+                bill.PaymentMode = "Cash"; // Default for auto-completion
+                bill.Description = $"Lab Test: {order.TestType} (Completed)";
             }
 
             await _context.SaveChangesAsync();
+            // ... (SignalR code remains same)
 
             // Real-time notification: Lab Report Ready
             var patientName = await _context.Users.Where(u => u.Id == order.PatientUserId).Select(u => u.FullName).FirstOrDefaultAsync();
@@ -202,7 +209,8 @@ namespace MediCore.API.Modules.Laboratory.Controllers
         public class CompleteOrderDto
         {
             public string? ResultNotes { get; set; }
-            public string? ReportUrl { get; set; }
+            public string? ReportPdfUrl { get; set; }
+            public string? ResultsJson { get; set; }
         }
     }
 }

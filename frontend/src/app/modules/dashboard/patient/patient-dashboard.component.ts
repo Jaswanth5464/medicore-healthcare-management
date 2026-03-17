@@ -230,12 +230,30 @@ declare var QRCode: any;
               <div class="section" *ngIf="consultationData().labOrders?.length > 0">
                 <h3><span class="icon">🔬</span> Lab Tests Ordered</h3>
                 <ul class="lab-list">
-                  <li *ngFor="let lab of consultationData().labOrders">
-                    <strong>{{ lab.testType }}</strong> - {{ lab.notes }}
-                    <span class="lab-status" *ngIf="lab.status !== 'Completed'">{{ lab.status }}</span>
-                    <span *ngIf="lab.status === 'Completed' && lab.reportUrl" style="margin-left: 8px;">
-                      <a [href]="lab.reportUrl" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: 500;">Download Report (PDF)</a>
-                    </span>
+                  <li *ngFor="let lab of consultationData().labOrders" class="lab-list-item">
+                    <div class="lab-summary">
+                      <strong>{{ lab.testType }}</strong> - {{ lab.notes }}
+                      <span class="lab-status" [class]="lab.status.toLowerCase()">{{ lab.status }}</span>
+                    </div>
+
+                    <!-- Lab Results for Patient -->
+                    <div *ngIf="lab.status === 'Completed' && lab.resultsJson" class="lab-results-box">
+                      <table>
+                        <thead><tr><th>Test Parameter</th><th>Your Result</th><th>Ref Range</th></tr></thead>
+                        <tbody>
+                          <tr *ngFor="let res of parseResults(lab.resultsJson)">
+                            <td>{{ res.parameter }}</td>
+                            <td class="res-val" [class.critical]="lab.criticalAlert">{{ res.value }}</td>
+                            <td class="ref-range">{{ res.normalRange }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div *ngIf="lab.status === 'Completed' && lab.reportUrl" class="lab-actions">
+                      <a [href]="lab.reportUrl" target="_blank" class="download-link">🔗 Download Official PDF Report</a>
+                      <span *ngIf="lab.resultNotes" class="lab-tech-note"><strong>Note:</strong> {{ lab.resultNotes }}</span>
+                    </div>
                   </li>
                 </ul>
               </div>
@@ -447,13 +465,18 @@ declare var QRCode: any;
               </div>
               
               <div class="bill-doctor">
-                <span>Doctor:</span> <strong>Dr. {{ b.doctorName }}</strong>
+                <span *ngIf="b.billSource === 'Laboratory'">🧪 Lab Test</span>
+                <span *ngIf="b.billSource !== 'Laboratory'">Doctor:</span> 
+                <strong>{{ b.billSource === 'Laboratory' ? 'Diagnostics Center' : 'Dr. ' + b.doctorName }}</strong>
               </div>
 
               <div class="bill-items">
                 <div class="bill-item" *ngFor="let item of parseItems(b.items)">
-                  <span>{{ item.description }}</span>
-                  <span>₹{{ item.amount }}</span>
+                  <span style="display:flex; align-items:center; gap:8px;">
+                    <svg *ngIf="b.billSource === 'Laboratory'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    {{ item.description || item.name || 'Service Item' }}
+                  </span>
+                  <span>₹{{ item.amount || item.price }}</span>
                 </div>
               </div>
 
@@ -618,9 +641,21 @@ declare var QRCode: any;
     .medicines pre { font-family:inherit; font-size:14px; color:#334155; white-space:pre-wrap; margin-top:8px; }
     .advice { color:#0369a1; font-size:14px; background:#e0f2fe; padding:12px; border-radius:8px; }
 
-    .lab-list { list-style:none; padding:0; display:flex; flex-direction:column; gap:8px; }
-    .lab-list li { background:#f8fafc; border:1px solid #e2e8f0; padding:12px 16px; border-radius:10px; font-size:14px; color:#334155; display:flex; justify-content:space-between; align-items:center; }
-    .lab-status { font-size:11px; font-weight:700; background:#fef3c7; color:#b45309; padding:4px 8px; border-radius:12px; text-transform:uppercase; }
+    .lab-list { list-style:none; padding:0; display:flex; flex-direction:column; gap:12px; }
+    .lab-list-item { background:#f8fafc; border:1px solid #e2e8f0; padding:16px; border-radius:12px; }
+    .lab-summary { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:14px; }
+    .lab-status { font-size:10px; font-weight:700; background:#fef3c7; color:#b45309; padding:4px 10px; border-radius:12px; text-transform:uppercase; }
+    .lab-status.completed { background:#dcfce7; color:#166534; }
+    .lab-results-box { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:12px; }
+    .lab-results-box table { width:100%; border-collapse:collapse; font-size:12px; }
+    .lab-results-box th { text-align:left; color:#64748b; padding-bottom:8px; border-bottom:1px solid #f1f5f9; }
+    .lab-results-box td { padding:8px 0; border-bottom:1px dashed #f1f5f9; }
+    .res-val { font-weight:700; color:#1e1b4b; }
+    .res-val.critical { color:#ef4444; }
+    .ref-range { color:#94a3b8; font-size:11px; }
+    .lab-actions { display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px solid #f1f5f9; }
+    .download-link { font-size:12px; color:#2563eb; font-weight:600; text-decoration:none; }
+    .lab-tech-note { font-size:11px; color:#64748b; font-style:italic; }
 
     .empty-data { text-align:center; padding:40px; color:#94a3b8; font-style:italic; border:1px dashed #cbd5e1; border-radius:12px; }
 
@@ -1010,6 +1045,14 @@ export class PatientDashboardComponent implements OnInit, AfterViewChecked {
           },
           error: () => this.notify.error('Failed to cancel appointment.')
         });
+    }
+  }
+
+  parseResults(json: string) {
+    try {
+      return JSON.parse(json || '[]');
+    } catch {
+      return [];
     }
   }
 

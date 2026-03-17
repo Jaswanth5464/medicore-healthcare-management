@@ -149,7 +149,6 @@ namespace MediCore.API.Modules.Laboratory.Controllers
                 bill.Status = "Paid";
                 bill.PaidAt = DateTime.UtcNow;
                 bill.PaymentMode = "Cash"; // Default for auto-completion
-                bill.Description = $"Lab Test: {order.TestType} (Completed)";
             }
 
             await _context.SaveChangesAsync();

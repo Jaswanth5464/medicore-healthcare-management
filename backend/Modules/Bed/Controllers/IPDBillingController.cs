@@ -56,11 +56,16 @@ namespace MediCore.API.Modules.Bed.Controllers
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var userId = userIdClaim != null ? int.Parse(userIdClaim) : 0;
 
+            // Check if room charge already exists for today
+            var today = DateTime.UtcNow.Date;
+            var roomChargeAlreadyAdded = await _context.DailyIPDCharges
+                .AnyAsync(c => c.AdmissionId == request.AdmissionId && c.CreatedAt.Date == today && c.RoomCharge > 0);
+
             var charge = new DailyIPDCharge
             {
                 AdmissionId = request.AdmissionId,
                 ChargeDate = DateTime.UtcNow,
-                RoomCharge = admission.DailyRoomCharge, // Automatically add room charge
+                RoomCharge = roomChargeAlreadyAdded ? 0 : admission.DailyRoomCharge, // Automatically add room charge only once per day
                 DoctorVisitCharge = request.DoctorVisitCharge,
                 NursingCharge = request.NursingCharge,
                 MedicineCharge = request.MedicineCharge,

@@ -807,8 +807,8 @@ namespace MediCore.API.Modules.OPD.Controllers
 
         // GET api/appointments/slots
         // Get available slots for a doctor on a date
-        // This function saves the medicine prescription written by the doctor.
-        [HttpPost("prescription")]
+        // Returns available appointment slots for a doctor on the requested date.
+        [HttpGet("slots")]
         public async Task<IActionResult> GetAvailableSlots(
             [FromQuery] int doctorProfileId,
             [FromQuery] DateTime date)

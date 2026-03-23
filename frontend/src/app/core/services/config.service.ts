@@ -8,10 +8,17 @@ export class ConfigService {
   private readonly baseUrl = 'http://medicore-api-jaswanth.us-east-1.elasticbeanstalk.com';
 
   get apiUrl(): string {
-    return `${this.baseUrl}/api`;
+    return `${this.baseApiUrl}/api`;
   }
 
   get baseApiUrl(): string {
+    if (typeof window !== 'undefined') {
+      const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (isLocalhost && isDevMode()) {
+        return 'http://localhost:5031';
+      }
+    }
+
     return this.baseUrl;
   }
 }

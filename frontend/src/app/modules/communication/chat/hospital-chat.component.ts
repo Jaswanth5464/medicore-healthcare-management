@@ -577,14 +577,38 @@ export class HospitalChatComponent implements AfterViewChecked, OnDestroy {
   }
 
   loadHistory(toUserId: string) {
-    this.http.get<any>(`${this.config.baseApiUrl}/api/chat/recent?withUserId=${toUserId}`, {
-      headers: { Authorization: `Bearer ${this.auth.getAccessToken()}` }
-    }).subscribe(r => {
-      if (r.success && r.data?.length) {
-        const existing = this.signalR.chatMessages();
-        const existingIds = new Set(existing.map((e: any) => e.id).filter(Boolean));
-        const fresh = r.data.filter((m: any) => !m.id || !existingIds.has(m.id));
-        this.signalR.chatMessages.set([...existing, ...fresh]);
+    const headers = { Authorization: `Bearer ${this.auth.getAccessToken()}` };
+
+    this.http.get<any>(`${this.config.baseApiUrl}/api/chat/recent?withUserId=${toUserId}`, { headers }).subscribe({
+      next: (r) => {
+        if (r.success && r.data?.length) {
+          const existing = this.signalR.chatMessages();
+          const existingIds = new Set(existing.map((e: any) => e.id).filter(Boolean));
+          const fresh = r.data.filter((m: any) => !m.id || !existingIds.has(m.id));
+          this.signalR.chatMessages.set([...existing, ...fresh]);
+        }
+      },
+      error: (err) => {
+        if (err?.status === 403) {
+          // Fallback for Doctor↔Patient chat pairs when appointment-scoped history is forbidden.
+          this.http.get<any>(`${this.config.baseApiUrl}/api/chat/patient-doctor/messages?partnerId=${encodeURIComponent(String(toUserId))}`, { headers })
+            .subscribe({
+              next: (fallback) => {
+                if (fallback.success && fallback.data?.length) {
+                  const existing = this.signalR.chatMessages();
+                  const existingIds = new Set(existing.map((e: any) => e.id).filter(Boolean));
+                  const fresh = fallback.data.filter((m: any) => !m.id || !existingIds.has(m.id));
+                  this.signalR.chatMessages.set([...existing, ...fresh]);
+                }
+              },
+              error: () => {
+                console.warn('Chat history fallback failed for user', toUserId);
+              }
+            });
+          return;
+        }
+
+        console.warn('Chat history load failed for user', toUserId, err);
       }
     });
   }
